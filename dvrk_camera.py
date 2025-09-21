@@ -34,9 +34,9 @@ class dvrk_camera:
 
     def DrawKeyPoint(self, img, pt, radius=5, color=(0, 0, 255), thickness=-1, text = None):
         img_copy = img.copy()
-        output = cv2.circle(img_copy, (pt[0],pt[1]), radius, color, thickness)
+        output = cv2.circle(img_copy, (int(pt[0]),int(pt[1])), radius, color, thickness)
         if text is not None:
-            output = cv2.putText(img_copy, text, (pt[0] - 20, pt[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+            output = cv2.putText(img_copy, text, (int(pt[0]) - 20, int(pt[1]) - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
         return output
     
     def DrawKeyPointsList(self, img, pt_list, radius=5, color=(0,0,255), thickness=-1, text_list = None):
@@ -153,6 +153,7 @@ class dvrk_camera:
             else:
                 key = MatchedKeys[index]
                 ref_pt = reference_list[key]
+                measured_pt = (int(measured_pt[0]), int(measured_pt[1]))
                 output = cv2.arrowedLine(output, measured_pt, ref_pt, color, thickness) 
                 index += 1
         return output

@@ -13,7 +13,7 @@ class dvrk_arm:
     def ReadInputs(self, js_input, cp_t_input, cp_R_input):
         self.js_his = js_input
         self.cp_t_his = cp_t_input
-        self.cp_R_his = [data.reshape(3,3).T for data in cp_R_input]
+        self.cp_R_his = [data.reshape(3,3) for data in cp_R_input]
         T_cr_his = []
         for i in range(len(js_input)):
             Tr6 = dvrk_DH_transformation(js_input[i], end_joint=6)
