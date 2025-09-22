@@ -1,4 +1,5 @@
 import numpy as np
+import cv2 
 
 def PixelProjection(position_camera, K):
     fx = K[0,0]
@@ -96,6 +97,26 @@ def LineABCToHesseForm(line_equation):
     B = B/sqr_sum
     C = C/sqr_sum
     return (C, np.arctan2(B,A))
+
+# PnP find hand-eye transformation matrix
+# Return Tcr, which transforms from robot to camera frame
+def PnPEstimation(pt_robot_list, pixel_cam_list, K, dist_coeffs=np.zeros((4,1))):
+    camera_matrix = np.array(K, dtype=np.float32)
+    n_pt_robot = len(pt_robot_list)
+    n_pixel = len(pixel_cam_list)
+    assert n_pixel == n_pt_robot, "2D-3D corrospendence mismatch"
+    image_pts = np.array(pixel_cam_list, dtype=np.float32)
+    obj_pts = np.array(pt_robot_list, dtype=np.float32)
+    dist_coeffs = np.array(dist_coeffs, dtype=np.float32)
+    success, rvec, tvec, inliers = cv2.solvePnPRansac(obj_pts, image_pts, camera_matrix, dist_coeffs, reprojectionError=8.0, confidence=0.99, flags=cv2.SOLVEPNP_ITERATIVE)
+    if success:
+        Tcr = np.identity(4)
+        Tcr[:3,-1] = tvec.ravel()
+        R, _ = cv2.Rodrigues(rvec)
+        Tcr[:3,:3] = R
+        return Tcr
+    else:
+        return
 
 # Decide dominant sides 
 # KeyPointsName = ["rf","rb","rr","rl","pf","pb","pr","pl","ef","eb"]

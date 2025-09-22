@@ -4,7 +4,7 @@ from Kinematics import GetPositionInBaseFrame
 
 class EKF_SuperDataSet:
     def __init__(self, state_mean_init, state_cov_init, measure_cov_init, Tcr_init):
-        self.__state_cov = state_cov_init*1e-3 # 6*6
+        self.__state_cov = state_cov_init # 6*6
         self.__state_mean = state_mean_init # 6*1
         self.__measure_cov = measure_cov_init # 2*2 for pixels
         self.__Tcr_init = Tcr_init

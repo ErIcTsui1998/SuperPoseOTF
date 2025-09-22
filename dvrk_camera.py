@@ -158,35 +158,25 @@ class dvrk_camera:
                 index += 1
         return output
     
-#     def CannyEdgeDetection(self, img, t_lower=50, t_upper=150):
-#         img_copy = img.copy()
-#         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-#         gray_img = cv2.cvtColor(img_copy, cv2.COLOR_BGR2GRAY)
-#         blurred_image = cv2.GaussianBlur(gray_img, (5, 5), 1.4)
-#         blurred_image = clahe.apply(blurred_image)
-#         edges = cv2.Canny(blurred_image, t_lower, t_upper)
-#         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 80, 40, 10)
-#         if lines is not None:
-#             for i in range(0, len(lines)):
-#                 rho = lines[i][0][0]
-#                 theta = lines[i][0][1]
-#                 a = np.cos(theta)
-#                 b = np.sin(theta)
-#                 x0 = a * rho
-#                 y0 = b * rho
-#                 pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
-#                 pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
-#                 cv2.line(img_copy, pt1, pt2, (0,0,255), 2, cv2.LINE_AA)
-#         cv2.imshow('lines', img_copy)
-#         cv2.waitKey(0)
-#         return edges
-
-# def change_brightness(img, value=30):
-#     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-#     h, s, v = cv2.split(hsv)
-#     v = cv2.add(v,value)
-#     v[v > 255] = 255
-#     v[v < 0] = 0
-#     final_hsv = cv2.merge((h, s, v))
-#     img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-#     return img
+    def CannyEdgeDetection(self, img, t_lower=50, t_upper=150):
+        img_copy = img.copy()
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray_img = cv2.cvtColor(img_copy, cv2.COLOR_BGR2GRAY)
+        blurred_image = cv2.GaussianBlur(gray_img, (5, 5), 1.4)
+        blurred_image = clahe.apply(blurred_image)
+        edges = cv2.Canny(blurred_image, t_lower, t_upper)
+        lines = cv2.HoughLines(edges, 1, np.pi / 100, 50, minLineLength=10, maxLineGap=250)
+        if lines is not None:
+            for i in range(0, len(lines)):
+                rho = lines[i][0][0]
+                theta = lines[i][0][1]
+                a = np.cos(theta)
+                b = np.sin(theta)
+                x0 = a * rho
+                y0 = b * rho
+                pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
+                pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
+                cv2.line(img_copy, pt1, pt2, (0,0,255), 2, cv2.LINE_AA)
+        cv2.imshow('lines', img_copy)
+        cv2.waitKey(0)
+        return edges
