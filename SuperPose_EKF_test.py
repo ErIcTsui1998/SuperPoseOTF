@@ -14,17 +14,10 @@ from EKF_Knownpairs import EKF_SuperDataSet
 from AEKF_Knownpairs import AEKF_SuperDataSet
 from EKF_MC_Knownpairs import EKF_MC_dVRKDataSet
 from Illustration import DynamicDrawThreeLines
-import argparse
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--id', type=str, help='dir id')
-    # args = parser.parse_args()
-    # dir_id = args.id
     dir_id = "000001"
-
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -87,7 +80,6 @@ if __name__ == "__main__":
     # if "Tcr_psm1_200.txt" in os.listdir(SubDataSet+"/HandEye"):
     #     os.chdir(SubDataSet+"/HandEye")
     #     T_cr1 = np.loadtxt("Tcr_psm1_200.txt")
-
 
     ##################### Key points Initialisation ################################
     KeyPointsName = ["rf","rr","rl","pf","pl","ef","gr","gl","rb","pb","eb"]

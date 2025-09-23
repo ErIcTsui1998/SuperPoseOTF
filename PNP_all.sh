@@ -3,13 +3,16 @@ echo "Directories in $(pwd):"
 for d in */ ; do
     if [ -d "$d" ]; then
         echo "$d"
-        if [ -d "$d/HandEye" ];then
+        if [ -f "$d/HandEye/Tcr_psm3_100.txt" ];then
 		echo "HandEye folder exists"     
         else
         	echo "HandEye not found"
         	folder_name=$(basename "$d")
-        	python3 /home/zc519/Projects/SuperPose_OTF/SuperPose_EKF_test.py --id "$folder_name"
+        	python3 /home/zc519/Projects/SuperPose_OTF/SuperPose_PNP.py --id "$folder_name"
         	echo "$folder_name"
         fi
+        #folder_name=$(basename "$d")
+	#python3 /home/zc519/Projects/SuperPose_OTF/SuperPose_PNP.py --id "$folder_name"
+	#echo "$folder_name"
     fi
 done
