@@ -11,6 +11,6 @@ https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7727408 \\
 https://github.com/zijianwu1231/SurgPose \\
 https://arxiv.org/pdf/2502.11534
 
-Date: 23/09/2025 \\
-Initial Hand-eye calibration conducted via PnP \\
+Date: 23/09/2025 <br>
+Initial Hand-eye calibration conducted via PnP <br>
 Aim: Evaluate whether the algorithm works out for PSM3 calibration
