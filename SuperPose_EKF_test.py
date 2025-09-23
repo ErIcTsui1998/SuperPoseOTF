@@ -88,12 +88,13 @@ if __name__ == "__main__":
     KeyPointsJointDic = {"rf":4, "rb":4, "rr":4, "rl":4, "pf":5, "pb":5, "pr":5, "pl":5, "ef":6, "eb":6, "gr":6, "gl":6}
     LabelDic = {1:"rf", 2:"pf", 3:"ef", 4:"gl", 5:"gr", 6:"pl", 7:"rl", 8:"rf", 9:"pf", 10:"ef", 11:"gl", 12:"gr", 13:"pr", 14:"rr"}
     
-    KeyPointsNamePSM1 = [item for item in KeyPointsName if "g" not in item] # everything excluding gripper tips, PSM1
-    KeyPointsNamePSM3 = [item for item in KeyPointsName if "g" not in item] # everything excluding gripper tips, PSM3
+    KeyPointsNamePSM1 = [item for item in KeyPointsName] # everything excluding gripper tips, PSM1
+    KeyPointsNamePSM3 = [item for item in KeyPointsName] # everything excluding gripper tips, PSM3
 
     # JCBB Initialisation
     # LandmarkPSM1Name = ["rf","pf","ef","pl","rl"]
-    LandmarkPSM1Name = ["rf","rb","rr","rl","pf","pb", "pr","pl","ef","eb"]
+    # LandmarkPSM1Name = ["rf","rb","rr","rl","pf","pb", "pr","pl","ef","eb"]
+    LandmarkPSM1Name = KeyPointsName
     LandmarkPSM1Value = list(range(len(LandmarkPSM1Name)))
 
     LandmarkPSM1Dic = dict(zip(LandmarkPSM1Name, LandmarkPSM1Value))
@@ -110,8 +111,8 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*9.5e-4
-    cov_measure = np.array([50,50])
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*15e-4
+    cov_measure = np.array([5,5])
     forget_factor = 0.3
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
 
@@ -141,7 +142,7 @@ if __name__ == "__main__":
 
         ###############  start from PSM1 only ###########
         PSM1_js = PSM1.js_his[index]
-        alpha = 0.0
+        alpha = 2*np.pi/180
         KeyPointsRelDic["gr"] = np.array([(9e-3)*np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), (9e-3)*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
         KeyPointsRelDic["gl"] = np.array([-(6.5e-3)*np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), (6.5e-3)*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
         
@@ -173,13 +174,14 @@ if __name__ == "__main__":
         pe_part_evaluation = IsPointAbovelineList(KeyPointsPixel[4:10], SkeletonLine_list[1])
         pe_part_central_distance = GetPointToLineDistanceList(KeyPointsPixel[4:10], SkeletonLine_list[1])
 
-        overall_evaluation = roll_part_evaluation + pe_part_evaluation
-        overall_central_distance = roll_part_central_distance + pe_part_central_distance
+        # overall_evaluation = roll_part_evaluation + pe_part_evaluation
+        # overall_central_distance = roll_part_central_distance + pe_part_central_distance
 
-        # grip_part_evaluation = IsPointAbovelineList([gr_pixel, gl_pixel], SkeletonLine_list[2])
-        # grip_part_central_distance = GetPointToLineDistanceList([gr_pixel, gl_pixel], SkeletonLine_list[2])        
-        # overall_evaluation = roll_part_evaluation + pe_part_evaluation + grip_part_evaluation
-        # overall_central_distance = roll_part_central_distance + pe_part_central_distance + grip_part_central_distance
+        grip_part_evaluation = IsPointAbovelineList([gr_pixel, gl_pixel], SkeletonLine_list[2])
+        grip_part_central_distance = GetPointToLineDistanceList([gr_pixel, gl_pixel], SkeletonLine_list[2])   
+
+        overall_evaluation = roll_part_evaluation + pe_part_evaluation + grip_part_evaluation
+        overall_central_distance = roll_part_central_distance + pe_part_central_distance + grip_part_central_distance
 
         Top_distance_list = GetPointToLineDistanceList(KeyPointsPixel, Edges[1])
         Down_distance_list = GetPointToLineDistanceList(KeyPointsPixel, Edges[0])
@@ -194,7 +196,7 @@ if __name__ == "__main__":
 
         # Draw keypoints and labels
         # KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key < 7 and key != 4 and key !=5}
-        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7 and key != 4 and key !=5}
+        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7}
         UV_KP_NAMES_PSM1 = list(KP_UV_LABELLED_PSM1.keys())
         UV_KP_NAMES_PSM1 = [str(item) for item in UV_KP_NAMES_PSM1]
         UV_KP_PIXELS_PSM1 = list(KP_UV_LABELLED_PSM1.values())
@@ -220,14 +222,14 @@ if __name__ == "__main__":
         MatchedMeasurementDict = dict(zip(MatchedNameList, MatchedValueList))
         JacobiansDict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
-        # EKF_obj1.EKFReadMeasurement(KeyPointsPixelDic, MatchedMeasurementDict, JacobiansDict)
-        # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
-        # RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
-
-        AEKF_obj1.AEKFReadMeasurement(KeyPointsPosPSMDic, MatchedMeasurementDict, JacobiansDict, K_right)
-        T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
-        mean_state, cov_state = AEKF_obj1.ReturnStateEstimation()
+        EKF_obj1.EKFReadMeasurement(KeyPointsPixelDic, MatchedMeasurementDict, JacobiansDict)
+        T_cr1_new = EKF_obj1.ReturnTcrEstimation()
         RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
+
+        # AEKF_obj1.AEKFReadMeasurement(KeyPointsPosPSMDic, MatchedMeasurementDict, JacobiansDict, K_right)
+        # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
+        # mean_state, cov_state = AEKF_obj1.ReturnStateEstimation()
+        # RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPixelDic, MatchedMeasurementDict, JacobiansDict)
         # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
