@@ -5,7 +5,7 @@ import random
 import yaml
 import cv2
 from utils import get_rigid_transform, GetPositionInBaseFrame, GetPositionInCameraFrame, QuaternionToRot, dvrk_DH_transformation
-from utils_vision import PnPEstimation
+from utils_vision import PnPEstimation, GetROIFromKinematics, GetListOfLineEquationFromPointSet, IsPointAbovelineList, GetPointToLineDistanceList, VisibilityEvaluation, IsPointVisibleList
 from dvrk_camera import dvrk_camera
 from Jacobian import JacobianCalculatorImage, RotX, RotY, RotZ
 from SuperPoseArmKinematics import dvrk_arm
@@ -17,16 +17,14 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000001"
+    dir_id = "000031"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
     PSM3 = dvrk_arm()
     SubDataSet = os.path.join(BaseFolder, dir_id)
-    # LeftImagesFolder = os.path.join(SubDataSet, "green/LeftImages")
     LeftImagesFolder = os.path.join(SubDataSet, "regular/LeftImages")
     LeftImages = os.listdir(LeftImagesFolder)
-    # RightImagesFolder = os.path.join(SubDataSet, "green/RightImages")
     RightImagesFolder = os.path.join(SubDataSet, "regular/RightImages")
     RightImages = os.listdir(RightImagesFolder)
     assert len(LeftImages) == len(RightImages), "left and right images do not match in number"
@@ -77,27 +75,26 @@ if __name__ == "__main__":
 
     T_cr1 = PSM1.T_cr_his[0]
     T_cr3 = PSM3.T_cr_his[0]
-    # if "Tcr_psm1_200.txt" in os.listdir(SubDataSet+"/HandEye"):
-    #     os.chdir(SubDataSet+"/HandEye")
-    #     T_cr1 = np.loadtxt("Tcr_psm1_200.txt")
+    if "Tcr_psm1_800.txt" in os.listdir(SubDataSet+"/HandEye"):
+        os.chdir(SubDataSet+"/HandEye")
+        T_cr1 = np.loadtxt("Tcr_psm1_800.txt")
 
     ##################### Key points Initialisation ################################
-    KeyPointsName = ["rf","rr","rl","pf","pl","ef","gr","gl","rb","pb","eb"]
+    KeyPointsName = ["rf","rb","rr","rl","pf","pb","pr","pl","ef","eb","gr","gl"]
     JointIndex = [1,2,3,4,5,6,7]
     KeyPointsRelDic = {"rf":np.array([-0.004, 0,-0.00625]), "rb":np.array([0.004, 0,-0.00625]), "rr":np.array([0, 0.004,0]), "rl":np.array([0, -0.004,0]),
                     "pf":np.array([0.00275, -0.00275, -0.00025]), "pb":np.array([0.00275, 0.00275, 0.00025]), "pr":np.array([0.0035, -0.0015, 0.003]), "pl":np.array([0.0035, 0.0015, -0.003]),
                     "ef":np.array([0.0, 0.0 ,-0.00275]), "eb":np.array([0.0, 0.0 ,0.00275]), "gr":np.array([0.0, 0.0102, 0.0]), "gl":np.array([0.0, 0.0102, 0.0])}
     KeyPointsJointDic = {"rf":4, "rb":4, "rr":4, "rl":4, "pf":5, "pb":5, "pr":5, "pl":5, "ef":6, "eb":6, "gr":6, "gl":6}
     LabelDic = {1:"rf", 2:"pf", 3:"ef", 4:"gl", 5:"gr", 6:"pl", 7:"rl", 8:"rf", 9:"pf", 10:"ef", 11:"gl", 12:"gr", 13:"pr", 14:"rr"}
-    # LabelDic = {1:"rb", 2:"pb", 3:"eb", 4:"gr", 5:"gl", 6:"pr", 7:"rr", 8:"rb", 9:"pb", 10:"eb", 11:"gr", 12:"gl", 13:"pl", 14:"rl"}
-    KeyPointsNamePSM1 = list(LabelDic.values())[:7]
-    KeyPointsNamePSM3 = list(LabelDic.values())[7:]
+    
+    KeyPointsNamePSM1 = [item for item in KeyPointsName if "g" not in item] # everything excluding gripper tips, PSM1
+    KeyPointsNamePSM3 = [item for item in KeyPointsName if "g" not in item] # everything excluding gripper tips, PSM3
+
     # JCBB Initialisation
-    # LandmarkPSM1Name = ["rf","pf","ef","gl","gr","pl","rl"]
-    # LandmarkPSM1Value = [0,1,2,3,4,5,6]
-    LandmarkPSM1Name = ["rf","pf","ef","pl","rl"]
-    # LandmarkPSM1Name = ["rb","pb","eb","pr","rr"]
-    LandmarkPSM1Value = [0,1,2,3,4]
+    # LandmarkPSM1Name = ["rf","pf","ef","pl","rl"]
+    LandmarkPSM1Name = ["rf","rb","rr","rl","pf","pb", "pr","pl","ef","eb"]
+    LandmarkPSM1Value = list(range(len(LandmarkPSM1Name)))
 
     LandmarkPSM1Dic = dict(zip(LandmarkPSM1Name, LandmarkPSM1Value))
     LandmarkPSM1DicInv = dict(zip(LandmarkPSM1Value, LandmarkPSM1Name))
@@ -113,7 +110,7 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.01, 0.01, 0.01, 0.5e-3, 0.5e-3, 0.5e-3])*1e-4
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*9.5e-4
     cov_measure = np.array([50,50])
     forget_factor = 0.3
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
@@ -121,8 +118,8 @@ if __name__ == "__main__":
     # EKF MC Initialisation
     mean_state = np.zeros(6)
     cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*1e-4
-    cov_measure = np.array([50,50])
-    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=5)
+    cov_measure = np.array([20,20])
+    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=15)
 
     color_pink = (255,141,161)
     color_blue = (255,0,0)
@@ -148,8 +145,8 @@ if __name__ == "__main__":
         KeyPointsRelDic["gr"] = np.array([(9e-3)*np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), (9e-3)*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
         KeyPointsRelDic["gl"] = np.array([-(6.5e-3)*np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), (6.5e-3)*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
         
-        KeyPointsPosPSM = [GetPositionInBaseFrame(PSM1_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in LandmarkPSM1Name]
-        KeyPointsPosPSMDic = dict(zip(LandmarkPSM1Name, KeyPointsPosPSM))
+        KeyPointsPosPSM = [GetPositionInBaseFrame(PSM1_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsNamePSM1]
+        KeyPointsPosPSMDic = dict(zip(KeyPointsNamePSM1, KeyPointsPosPSM))
         JointPosPSM = [GetPositionInBaseFrame(PSM1_js, np.array([0,0,0]), i) for i in range(1,7)]
         KeyPointsPosCameraRight = RIGHT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPosPSM)
         JointPosCameraRight = RIGHT_CAM_PSM1.GetPositionInCameraFrameList(JointPosPSM)
@@ -164,72 +161,78 @@ if __name__ == "__main__":
         j1_pixel, j2_pixel, j3_pixel, j4_pixel, j5_pixel, j6_pixel = RIGHT_CAM_PSM1.PixelProjectionList(JointPosCameraRight)
         Edges = RIGHT_CAM_PSM1.GetEdgeProjectionCylinder(4e-3, PSM1_js)
         SkeletonPt_list = [j1_pixel, j4_pixel, j5_pixel, j6_pixel, gr_pixel, gl_pixel]
+        SkeletonLine_list = GetListOfLineEquationFromPointSet([(j1_pixel,j4_pixel),(j5_pixel,j6_pixel), (j6_pixel,gm_pixel)])
 
         overlay = RIGHT_CAM_PSM1.DrawToolSkeleton(img_right, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel)])
         overlay = RIGHT_CAM_PSM1.DrawLines(overlay, Edges)
 
+        ########################### Visibility Test & Scores ############################################
+        roll_part_evaluation = IsPointAbovelineList(KeyPointsPixel[:4], SkeletonLine_list[0])
+        roll_part_central_distance = GetPointToLineDistanceList(KeyPointsPixel[:4], SkeletonLine_list[0])
+        
+        pe_part_evaluation = IsPointAbovelineList(KeyPointsPixel[4:10], SkeletonLine_list[1])
+        pe_part_central_distance = GetPointToLineDistanceList(KeyPointsPixel[4:10], SkeletonLine_list[1])
+
+        overall_evaluation = roll_part_evaluation + pe_part_evaluation
+        overall_central_distance = roll_part_central_distance + pe_part_central_distance
+
+        # grip_part_evaluation = IsPointAbovelineList([gr_pixel, gl_pixel], SkeletonLine_list[2])
+        # grip_part_central_distance = GetPointToLineDistanceList([gr_pixel, gl_pixel], SkeletonLine_list[2])        
+        # overall_evaluation = roll_part_evaluation + pe_part_evaluation + grip_part_evaluation
+        # overall_central_distance = roll_part_central_distance + pe_part_central_distance + grip_part_central_distance
+
+        Top_distance_list = GetPointToLineDistanceList(KeyPointsPixel, Edges[1])
+        Down_distance_list = GetPointToLineDistanceList(KeyPointsPixel, Edges[0])
+        Side_distance_list = [min(i,j) for i, j in zip(Top_distance_list, Down_distance_list)]
+
+        visibility_score_dic = {}
+        visibility_score = VisibilityEvaluation(overall_evaluation, overall_central_distance, Side_distance_list, KeyPointsNamePSM1)
+        if len(visibility_score) > 0:
+            visibility_score = [round(visibility_score[i],2) for i in range(len(KeyPointsPixel))]
+            visibility_score_dic = dict(zip(LandmarkPSM1Value, visibility_score))
+        #########################################################################################################################
+
         # Draw keypoints and labels
-        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key < 7 and key != 4 and key !=5}
-        # KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key < 7}
+        # KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key < 7 and key != 4 and key !=5}
+        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7 and key != 4 and key !=5}
         UV_KP_NAMES_PSM1 = list(KP_UV_LABELLED_PSM1.keys())
         UV_KP_NAMES_PSM1 = [str(item) for item in UV_KP_NAMES_PSM1]
         UV_KP_PIXELS_PSM1 = list(KP_UV_LABELLED_PSM1.values())
         UV_KP_PIXELS_PSM1 = [tuple(item) for item in UV_KP_PIXELS_PSM1]
         overlay = RIGHT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, text_list=UV_KP_NAMES_PSM1, color = color_blue)
-        overlay = RIGHT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPixel, text_list=LandmarkPSM1Name)
+        overlay = RIGHT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPixel, text_list=KeyPointsNamePSM1)
 
         # JCBB data association using Jacobian 
-        JacobianValues_PSM1 = [JacobianCalculatorImage(K_right, np.zeros(3), np.zeros(3), T_cr1, KeyPointsPosPSMDic[name]) for name in LandmarkPSM1Name]
+        JacobianValues_PSM1 = [JacobianCalculatorImage(K_right, np.zeros(3), np.zeros(3), T_cr1, KeyPointsPosPSMDic[name]) for name in KeyPointsNamePSM1]
         JacobiansInput = dict(zip(LandmarkPSM1Value, JacobianValues_PSM1))
         JCBB_obj1.ReadPredictedFeatureValues(KeyPointsPixel, JacobiansInput, JCBB_obj1_cov_state)
-        JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure)
-        # OutputMatchedKeys = JCBB_obj1.ReturnMatchingKeys()
-        OutputMatchedKeys = [LandmarkPSM1Dic[name] for name in UV_KP_NAMES_PSM1]
+        JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure, visibility_score_dic)
+        OutputMatchedKeys = JCBB_obj1.ReturnMatchingKeys()
+        # OutputMatchedKeys = [LandmarkPSM1Dic[name] for name in UV_KP_NAMES_PSM1 if name in LandmarkPSM1Dic.keys()]
         JCBB_obj1.Clear()
         overlay = RIGHT_CAM_PSM1.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM1, KeyPointsPixel, OutputMatchedKeys, color_blue)
 
         ##################################### EKF/PF with known data associations block ################################################
-        KeyPointsPixelDic = dict(zip(LandmarkPSM1Name, KeyPointsPixel))
+        KeyPointsPixelDic = dict(zip(KeyPointsNamePSM1, KeyPointsPixel))
         IndexMatched = [i for i,j in enumerate(OutputMatchedKeys) if j is not None]
         MatchedNameList = [LandmarkPSM1DicInv[key] for key in OutputMatchedKeys if key is not None]
         MatchedValueList = [UV_KP_PIXELS_PSM1[index] for index in IndexMatched]
         MatchedMeasurementDict = dict(zip(MatchedNameList, MatchedValueList))
-        JacobiansDict = dict(zip(LandmarkPSM1Name, JacobianValues_PSM1))
+        JacobiansDict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
         # EKF_obj1.EKFReadMeasurement(KeyPointsPixelDic, MatchedMeasurementDict, JacobiansDict)
         # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
         # RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        # AEKF_obj1.AEKFReadMeasurement(KeyPointsPosPSMDic, MatchedMeasurementDict, JacobiansDict, K_right)
-        # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
-        # mean_state, cov_state = AEKF_obj1.ReturnStateEstimation()
-        # RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        AEKF_obj1.AEKFReadMeasurement(KeyPointsPosPSMDic, MatchedMeasurementDict, JacobiansDict, K_right)
+        T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
+        mean_state, cov_state = AEKF_obj1.ReturnStateEstimation()
+        RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPixelDic, MatchedMeasurementDict, JacobiansDict)
         # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
         # RIGHT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        # PnP initial calib
-        for name in KP_UV_LABELLED_PSM1.keys():
-            PNP_PIXEL_LIST.append(KP_UV_LABELLED_PSM1[name])
-            PNP_OBJ_PTS_LIST.append(KeyPointsPosPSMDic[name])
-        
-        if index == 100 or index == 200 or index == 300 or index == 400 or index ==500 or index == 600 or index == 700 or index ==800 or index==900 or index==1000:
-            Tcr_new = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_right, D_right)
-            RIGHT_CAM_PSM1.UpdateTcr(Tcr_new)
-            os.chdir(SubDataSet)
-            os.makedirs("HandEye", exist_ok=True)
-            os.chdir("HandEye")
-            file_name = "Tcr_psm1_"+str(index)+".txt"
-            np.savetxt(file_name, Tcr_new)
-
-        # # Visualise how state parameters have changed
-        # r_vec_his.append(cv2.Rodrigues(T_cr1[:3,:3])[0].reshape(1,-1)[0])
-        # t_vec_his.append(T_cr1[:3,-1])
-
-        # if index == 50:
-        #     DynamicDrawThreeLines(r_vec_his, ["theta1","theta2","theta3"])
-        #     DynamicDrawThreeLines(t_vec_his, ["x","y","z"])
         ##################### For PSM3 now ###########################################################################################
         # PSM3_js = PSM3.js_his[index]
         # KeyPointsPosPSM3 = [GetPositionInBaseFrame(PSM3_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsName]

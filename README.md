@@ -13,4 +13,8 @@ https://arxiv.org/pdf/2502.11534
 
 Date: 23/09/2025 <br>
 Initial Hand-eye calibration conducted via PnP <br>
-Aim: Evaluate whether the algorithm works out for PSM3 calibration
+Aim: Evaluate whether the algorithm works out for PSM3 calibration <br>
+
+Modifications: <br>
+1. Assume that no labels are available, for single instrument detection. <br>
+
