@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000031"
+    dir_id = "000012"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -75,9 +75,9 @@ if __name__ == "__main__":
 
     T_cr1 = PSM1.T_cr_his[0]
     T_cr3 = PSM3.T_cr_his[0]
-    if "Tcr_psm1_800.txt" in os.listdir(SubDataSet+"/HandEye"):
+    if "Tcr_psm1_1000.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr1 = np.loadtxt("Tcr_psm1_800.txt")
+        T_cr1 = np.loadtxt("Tcr_psm1_1000.txt")
 
     ##################### Key points Initialisation ################################
     KeyPointsName = ["rf","rb","rr","rl","pf","pb","pr","pl","ef","eb","gr","gl"]
@@ -110,8 +110,8 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*9.5e-4
-    cov_measure = np.array([50,50])
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*2e-4
+    cov_measure = np.array([25,25])
     forget_factor = 0.3
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
 
