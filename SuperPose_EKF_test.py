@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000004"
+    dir_id = "000025"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -78,9 +78,9 @@ if __name__ == "__main__":
     if "Tcr_psm1_500.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
         T_cr1 = np.loadtxt("Tcr_psm1_500.txt")
-    if "Tcr_psm3_500.txt" in os.listdir(SubDataSet+"/HandEye"):
+    if "Tcr_psm3_1000.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr3 = np.loadtxt("Tcr_psm3_500.txt")
+        T_cr3 = np.loadtxt("Tcr_psm3_1000.txt")
     
     ##################### Key points Initialisation ################################
     KeyPointsName = ["rf","rb","rr","rl","pf","pb","pr","pl","ef","eb","gr","gl"]
@@ -126,15 +126,15 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*2e-4
-    cov_measure = np.array([50,50])
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*1e-3
+    cov_measure = np.array([25,25])
     forget_factor = 0.3
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
     AEKF_obj3 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, forget_factor)
 
     # EKF MC Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*1e-4
+    cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*6e-4
     cov_measure = np.array([20,20])
     EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=15)
     EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=15)
@@ -149,7 +149,8 @@ if __name__ == "__main__":
         img_left = cv2.imread(img_name)
         os.chdir(RightImagesFolder)
         img_right = cv2.imread(img_name)
-        KP_UV_LABELLED_NOW = KP_labelled_right[index]
+        # KP_UV_LABELLED_NOW = KP_labelled_right[index]
+        KP_UV_LABELLED_NOW = KP_labelled_left[index]
 
         ###############  start from PSM1 only ###########
         # PSM1_js = PSM1.js_his[index]
@@ -251,23 +252,23 @@ if __name__ == "__main__":
         KeyPointsPSM3Pos = [GetPositionInBaseFrame(PSM3_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsNamePSM3]
         KeyPointsPSM3PosDic = dict(zip(KeyPointsNamePSM3, KeyPointsPSM3Pos))
         JointPSM3Pos = [GetPositionInBaseFrame(PSM3_js, np.array([0,0,0]), i) for i in range(1,7)]
-        KeyPointsPSM3PosCameraRight = RIGHT_CAM_PSM3.GetPositionInCameraFrameList(KeyPointsPSM3Pos)
-        JointPosPSM3CameraRight = RIGHT_CAM_PSM3.GetPositionInCameraFrameList(JointPSM3Pos)
-        KeyPointsPSM3Pixel = RIGHT_CAM_PSM3.PixelProjectionList(KeyPointsPSM3PosCameraRight)
+        KeyPointsPSM3PosCameraRight = LEFT_CAM_PSM3.GetPositionInCameraFrameList(KeyPointsPSM3Pos)
+        JointPosPSM3CameraRight = LEFT_CAM_PSM3.GetPositionInCameraFrameList(JointPSM3Pos)
+        KeyPointsPSM3Pixel = LEFT_CAM_PSM3.PixelProjectionList(KeyPointsPSM3PosCameraRight)
         gr_PSM3_pixel, gl_PSM3_pixel = KeyPointsPSM3Pixel[-2:]
 
         gm_PSM3rel = np.array([0.0, 0.0102, 0.0]) # gripper middle
         gm_PSM3Pos = GetPositionInBaseFrame(PSM3_js, gm_PSM3rel, 6)
-        gm_PSM3CameraRight = RIGHT_CAM_PSM3.GetPositionInCameraFrame(gm_PSM3Pos)
-        gm_PSM3pixel = RIGHT_CAM_PSM3.PixelProjection(gm_PSM3CameraRight)
+        gm_PSM3CameraRight = LEFT_CAM_PSM3.GetPositionInCameraFrame(gm_PSM3Pos)
+        gm_PSM3pixel = LEFT_CAM_PSM3.PixelProjection(gm_PSM3CameraRight)
 
-        j1_PSM3_pixel, j2_PSM3_pixel, j3_PSM3_pixel, j4_PSM3_pixel, j5_PSM3_pixel, j6_PSM3_pixel = RIGHT_CAM_PSM3.PixelProjectionList(JointPosPSM3CameraRight)
-        Edges_PSM3 = RIGHT_CAM_PSM3.GetEdgeProjectionCylinder(4e-3, PSM3_js)
+        j1_PSM3_pixel, j2_PSM3_pixel, j3_PSM3_pixel, j4_PSM3_pixel, j5_PSM3_pixel, j6_PSM3_pixel = LEFT_CAM_PSM3.PixelProjectionList(JointPosPSM3CameraRight)
+        Edges_PSM3 = LEFT_CAM_PSM3.GetEdgeProjectionCylinder(4e-3, PSM3_js)
         SkeletonPt_PSM3_list = [j1_PSM3_pixel, j4_PSM3_pixel, j5_PSM3_pixel, j6_PSM3_pixel, gr_PSM3_pixel, gl_PSM3_pixel]
         SkeletonLine_PSM3_list = GetListOfLineEquationFromPointSet([(j1_PSM3_pixel,j4_PSM3_pixel),(j5_PSM3_pixel,j6_PSM3_pixel), (j6_PSM3_pixel,gm_PSM3pixel)])
 
-        overlay = RIGHT_CAM_PSM3.DrawToolSkeleton(img_right, [(j1_PSM3_pixel,j4_PSM3_pixel), (j5_PSM3_pixel, j6_PSM3_pixel)], color=color_yellow)
-        overlay = RIGHT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, color=color_yellow)
+        overlay = LEFT_CAM_PSM3.DrawToolSkeleton(img_left, [(j1_PSM3_pixel,j4_PSM3_pixel), (j5_PSM3_pixel, j6_PSM3_pixel)], color=color_yellow)
+        overlay = LEFT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, color=color_yellow)
 
         ########################### Visibility Test & Scores ############################################
         roll_part_evaluation = IsPointAbovelineList(KeyPointsPSM3Pixel[:4], SkeletonLine_PSM3_list[0])
@@ -301,11 +302,11 @@ if __name__ == "__main__":
         UV_KP_NAMES_PSM3 = [str(item) for item in UV_KP_NAMES_PSM3]
         UV_KP_PIXELS_PSM3 = list(KP_UV_LABELLED_PSM3.values())
         UV_KP_PIXELS_PSM3 = [tuple(item) for item in UV_KP_PIXELS_PSM3]
-        overlay = RIGHT_CAM_PSM3.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM3, text_list=UV_KP_NAMES_PSM3, color = color_blue)
-        overlay = RIGHT_CAM_PSM3.DrawKeyPointsList(overlay, KeyPointsPSM3Pixel, text_list=KeyPointsNamePSM3)
+        overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM3, text_list=UV_KP_NAMES_PSM3, color = color_blue)
+        overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, KeyPointsPSM3Pixel, text_list=KeyPointsNamePSM3)
 
         # JCBB data association using Jacobian 
-        JacobianValues_PSM3 = [JacobianCalculatorImage(K_right, np.zeros(3), np.zeros(3), T_cr3, KeyPointsPSM3PosDic[name]) for name in KeyPointsNamePSM3]
+        JacobianValues_PSM3 = [JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr3, KeyPointsPSM3PosDic[name]) for name in KeyPointsNamePSM3]
         JacobiansInput_PSM3 = dict(zip(LandmarkPSM3Value, JacobianValues_PSM3))
         JCBB_obj3.ReadPredictedFeatureValues(KeyPointsPSM3Pixel, JacobiansInput_PSM3, JCBB_obj3_cov_state)
         # JCBB_obj3.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM3, JCBB_obj3_cov_measure, visibility_score_dic)
@@ -313,7 +314,7 @@ if __name__ == "__main__":
         OutputMatchedKeys_PSM3 = JCBB_obj3.ReturnMatchingKeys()
         # OutputMatchedKeys_PSM3 = [LandmarkPSM3Dic[name] for name in UV_KP_NAMES_PSM3 if name in LandmarkPSM3Dic.keys()]
         JCBB_obj3.Clear()
-        overlay = RIGHT_CAM_PSM3.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM3, KeyPointsPSM3Pixel, OutputMatchedKeys_PSM3, color_blue)
+        overlay = LEFT_CAM_PSM3.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM3, KeyPointsPSM3Pixel, OutputMatchedKeys_PSM3, color_blue)
 
         ##################################### EKF/PF with known data associations block ################################################
         KeyPointsPSM3PixelDic = dict(zip(KeyPointsNamePSM3, KeyPointsPSM3Pixel))
@@ -325,16 +326,16 @@ if __name__ == "__main__":
         
         # EKF_obj3.EKFReadMeasurement(KeyPointsPSM3PixelDic, MatchedMeasurementPSM3Dict, JacobiansPSM3Dict)
         # T_cr3_new = EKF_obj3.ReturnTcrEstimation()
-        # RIGHT_CAM_PSM3.UpdateTcr(T_cr3_new)
+        # LEFT_CAM_PSM3.UpdateTcr(T_cr3_new)
 
-        AEKF_obj3.AEKFReadMeasurement(KeyPointsPSM3PosDic, MatchedMeasurementPSM3Dict, JacobiansPSM3Dict, K_right)
+        AEKF_obj3.AEKFReadMeasurement(KeyPointsPSM3PosDic, MatchedMeasurementPSM3Dict, JacobiansPSM3Dict, K_left)
         T_cr3 = AEKF_obj3.ReturnTcrEstimation()
         mean_state_PSM3, cov_state_PSM3 = AEKF_obj3.ReturnStateEstimation()
-        RIGHT_CAM_PSM3.UpdateTcr(T_cr3)
+        LEFT_CAM_PSM3.UpdateTcr(T_cr3)
 
         # EKF_MC_OBJ3.EKFReadMeasurement(KeyPointsPSM3PixelDic, MatchedMeasurementPSM3Dict, JacobiansPSM3Dict)
         # T_cr3_new = EKF_MC_OBJ3.ReturnTcrEstimation()
-        # RIGHT_CAM_PSM3.UpdateTcr(T_cr3_new)
+        # LEFT_CAM_PSM3.UpdateTcr(T_cr3_new)
 
         cv2.imshow("overlay", overlay)
         if cv2.waitKey(10) & 0xFF == ord('q'):
