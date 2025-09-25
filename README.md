@@ -6,9 +6,10 @@ What to test: <br>
 2. How good it can perform when static camera positions. <br>
 3. In the face of kinematics labelling error. <br>
 
-Date: 24/09/2025 <br>
+Date: 25/09/2025 <br>
 Initial Hand-eye calibration conducted via PnP <br>
 Aim: Evaluate whether the algorithm works out for both PSM1 and PSM3 calibration <br>
+Evaluation criteria: 3D position for all labelled key points. <br>
 
 Modifications: <br>
 1. Assume that no labels are available, for double instruments detection. <br>
