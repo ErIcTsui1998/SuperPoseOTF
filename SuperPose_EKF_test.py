@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000025"
+    dir_id = "000000"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()

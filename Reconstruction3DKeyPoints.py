@@ -40,8 +40,10 @@ if __name__ == "__main__":
                 n_keypoints = len(KP_pixel_left[j])
                 PosDic = {}
                 for key, pixel_value in KP_pixel_left_current.items():
+                    if pixel_value == None:
+                        continue
                     u, v = pixel_value
-                    z = Depth_map[v,u] * 1e-3 # (m)
+                    z = Depth_map[int(v),int(u)] * 1e-3 # (m)
                     x = (u-cx) * z / fx
                     y = (v-cy) * z / fy
                     PosDic[key] = [float(x),float(y),float(z)]
