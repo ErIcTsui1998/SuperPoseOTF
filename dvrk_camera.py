@@ -18,19 +18,24 @@ class dvrk_camera:
     def GetPositionInCameraFrameList(self, position_base_list):
         return [self.GetPositionInCameraFrame(pos) for pos in position_base_list]
 
-    def PixelProjection(self, position_camera):
+    def PixelProjection(self, position_camera, distortion_array = [0,0,0,0,0]):
         fx = self.K[0,0]
         fy = self.K[1,1]
         cx = self.K[0,2]
         cy = self.K[1,2]
-        homo_x = position_camera[0] / position_camera[2]
-        homo_y = position_camera[1] / position_camera[2]
-        u = fx*homo_x + cx
-        v = fy*homo_y + cy
+        k1,k2,p1,p2,k3 = distortion_array
+        x,y,z = position_camera
+        x1=x/z
+        y1=y/z
+        r_sqr = x1**2 + y1**2
+        x2=x1*(1+k1*r_sqr+k2*r_sqr**2+k3*r_sqr**3)+2*p1*x1*y1+p2*(r_sqr+2*x1**2)
+        y2=y1*(1+k1*r_sqr+k2*r_sqr**2+k3*r_sqr**3)+p1*(r_sqr+2*y1**2)+2*p2*x1*y1
+        u = fx*x2 + cx
+        v = fy*y2 + cy
         return (int(u),int(v))
     
-    def PixelProjectionList(self, position_camera_list):
-        return [self.PixelProjection(pos) for pos in position_camera_list]
+    def PixelProjectionList(self, position_camera_list, distortion_array = [0,0,0,0,0]):
+        return [self.PixelProjection(pos, distortion_array) for pos in position_camera_list]
 
     def DrawKeyPoint(self, img, pt, radius=5, color=(0, 0, 255), thickness=-1, text = None):
         img_copy = img.copy()
