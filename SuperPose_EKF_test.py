@@ -82,9 +82,9 @@ if __name__ == "__main__":
 
     T_cr1 = PSM1.T_cr_his[0]
     T_cr3 = PSM3.T_cr_his[0]
-    if "Tcr_psm1_1000.txt" in os.listdir(SubDataSet+"/HandEye"):
+    if "Tcr_psm1_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr1 = np.loadtxt("Tcr_psm1_1000.txt")
+        T_cr1 = np.loadtxt("Tcr_psm1_600.txt")
     if "Tcr_psm3_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
         T_cr3 = np.loadtxt("Tcr_psm3_100.txt")
@@ -133,9 +133,9 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*7e-4
-    cov_measure = np.array([10,10])
-    forget_factor = 0.3
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*2e-4
+    cov_measure = np.array([25,25])
+    forget_factor = 0.6
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
     AEKF_obj3 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, forget_factor)
 
@@ -143,8 +143,8 @@ if __name__ == "__main__":
     mean_state = np.zeros(6)
     cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*6e-4
     cov_measure = np.array([20,20])
-    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=15)
-    EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=15)
+    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=10)
+    EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=10)
 
     color_pink = (255,141,161)
     color_blue = (255,0,0)
@@ -245,25 +245,36 @@ if __name__ == "__main__":
         MatchedMeasurementPSM1Dict = dict(zip(MatchedNamePSM1List, MatchedValuePSM1List))
         JacobiansPSM1Dict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
-        EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        T_cr1_new = EKF_obj1.ReturnTcrEstimation()
-        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        # EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
+        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         # AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
         # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
         # mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
         # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
-        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
+        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         ######################### Error Analysis 3d ############################################
         KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
-        KP_3D_CALIBRATED_SELECTED = [KP_3D_CALIBRATED_LIST[key] for key in OutputMatchedKeys_PSM1 if key != None]
+        KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM1PosCameraRight[key] for key in OutputMatchedKeys_PSM1 if key != None]
+        # KP_3D_CALIBRATED_SELECTED = [KP_3D_CALIBRATED_LIST[key] for key in OutputMatchedKeys_PSM1 if key != None]
         KP_3D_RECONSTRUCTED_SELECTED = [UV_KP_3D_PSM1[id_match] for id_match in IndexMatched_PSM1 if id_match != None]
         KP_3D_ERROR_LIST = [1e3*np.linalg.norm(KP_3D_CALIBRATED_SELECTED[i] - KP_3D_RECONSTRUCTED_SELECTED[i]) for i in range(len(KP_3D_CALIBRATED_SELECTED))]
         KP_3D_ERROR_DIC = dict(zip(MatchedNamePSM1List, KP_3D_ERROR_LIST))
+
+        if len(IndexMatched_PSM1) >= 4 and index >= 20:
+            PNP_PIXEL_LIST = [list(KP_UV_LABELLED_PSM1.values())[matched_id] for matched_id in IndexMatched_PSM1]
+            PNP_OBJ_PTS_LIST = [KeyPointsPSM1Pos[key] for key in OutputMatchedKeys_PSM1 if key != None]
+            Tcr_pnp = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
+            if Tcr_pnp is None:
+                print("EPnP failednow")
+            else:
+                # LEFT_CAM_PSM1.UpdateTcr(Tcr_pnp)
+                print("EPnP indication now")
 
         # ##################### For PSM3 now ###########################################################################################
         # PSM3_js = PSM3.js_his[index]
