@@ -14,8 +14,8 @@ K_right = np.array([[1801.712669735144, 0.0, 791.7629609322958],
 D_left = np.array([-0.251655177510111, 0.503352413478258, -0.002139555248137, -0.004349153536928, -0.246027939563351])
 D_right = np.array([-0.257090786509171, 0.101341249569555, 0.0007793893931081916, 0.0007405068673525044, 2.505085264989695])
 
-D_left = np.zeros(5)
-D_right = np.zeros(5)
+# D_left = np.zeros(5)
+# D_right = np.zeros(5)
 
 R_0 = 0.999940944984011
 R_1 = 0.010580130002784
@@ -90,7 +90,7 @@ if __name__ == "__main__":
             PosDic = {}
             for j in range(n_keys):
                kp_key = keys_common[j]
-               x, y, z = pts3D_init[j] * 1e-3 # unit (m)
+               x, y, z = R1.T @ pts3D_init[j] * 1e-3 # unit (m)
                PosDic[kp_key] = [float(x), float(y), float(z)]
             KP_pos_3d_left_dic[index] = PosDic
 
