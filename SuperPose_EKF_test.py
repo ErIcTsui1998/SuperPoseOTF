@@ -84,7 +84,7 @@ if __name__ == "__main__":
     T_cr3 = PSM3.T_cr_his[0]
     if "Tcr_psm1_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr1 = np.loadtxt("Tcr_psm1_600.txt")
+        T_cr1 = np.loadtxt("Tcr_psm1_200.txt")
     if "Tcr_psm3_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
         T_cr3 = np.loadtxt("Tcr_psm3_100.txt")
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     # EKF MC Initialisation
     mean_state = np.zeros(6)
     cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*6e-4
-    cov_measure = np.array([20,20])
+    cov_measure = np.array([25,25])
     EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=10)
     EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=10)
 
@@ -296,7 +296,7 @@ if __name__ == "__main__":
         # SkeletonPt_PSM3_list = [j3_PSM3_pixel, j4_PSM3_pixel, j5_PSM3_pixel, j6_PSM3_pixel, gr_PSM3_pixel, gl_PSM3_pixel]
         # SkeletonLine_PSM3_list = GetListOfLineEquationFromPointSet([(j3_PSM3_pixel,j4_PSM3_pixel),(j5_PSM3_pixel,j6_PSM3_pixel), (j6_PSM3_pixel,gm_PSM3pixel)])
 
-        # overlay = LEFT_CAM_PSM3.DrawToolSkeleton(img_left, [(j3_PSM3_pixel,j4_PSM3_pixel), (j5_PSM3_pixel, j6_PSM3_pixel)], color=color_yellow)
+        # overlay = LEFT_CAM_PSM3.DrawToolSkeleton(overlay, [(j3_PSM3_pixel,j4_PSM3_pixel), (j5_PSM3_pixel, j6_PSM3_pixel)], color=color_yellow)
         # overlay = LEFT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, color=color_yellow)
 
         # ########################### Visibility Test & Scores ############################################
