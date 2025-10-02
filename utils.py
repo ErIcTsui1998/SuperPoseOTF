@@ -110,3 +110,13 @@ def DiagMergeMats(mat_list):
         col_pos += mat_col
         row_pos += mat_row
     return output
+
+# Make a nested dictionary yaml writable 
+def MakeNumDicWritable(dic_ref):
+    for key, value in dic_ref.items():
+        if type(value) != dict:
+            value_writable = [float(item) if type(item)!=str else item for item in value]
+            dic_ref[key] = value_writable
+        else:
+            MakeNumDicWritable(value)
+    return dic_ref

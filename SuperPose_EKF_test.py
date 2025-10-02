@@ -4,7 +4,7 @@ import os
 import random
 import yaml
 import cv2
-from utils import get_rigid_transform, GetPositionInBaseFrame, GetPositionInCameraFrame, QuaternionToRot, dvrk_DH_transformation
+from utils import get_rigid_transform, GetPositionInBaseFrame, GetPositionInCameraFrame, QuaternionToRot, dvrk_DH_transformation, MakeNumDicWritable
 from utils_vision import PnPEstimation, GetROIFromKinematics, GetListOfLineEquationFromPointSet, IsPointAbovelineList, GetPointToLineDistanceList, VisibilityEvaluation, IsPointVisibleList
 from dvrk_camera import dvrk_camera
 from Jacobian import JacobianCalculatorImage, RotX, RotY, RotZ
@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000010"
+    dir_id = "000000"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -151,6 +151,13 @@ if __name__ == "__main__":
     color_blue = (255,0,0)
     color_yellow = (0,255,255)
 
+    KP_3D_PREDICTION_HIS = {}
+    KP_3D_MEASUREMENT_HIS = {}
+    KP_2D_PIXEL_PREDICTION_HIS = {}
+    KP_2D_PIXEL_MEASUREMENT_HIS = {}
+    T_PNP_HIS = {}
+    T_CR_HIS = {}
+
     for index in range(n_images):
         img_name = "frame" + str(index) + ".png"
         os.chdir(LeftImagesFolder)
@@ -170,6 +177,7 @@ if __name__ == "__main__":
         KeyPointsPSM1PosDic = dict(zip(KeyPointsNamePSM1, KeyPointsPSM1Pos))
         JointPSM1Pos = [GetPositionInBaseFrame(PSM1_js, np.array([0,0,0]), i) for i in range(1,7)]
         KeyPointsPSM1PosCameraRight = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
+        KeyPointsPSM1PosCameraDic = dict(zip(KeyPointsNamePSM1, KeyPointsPSM1PosCameraRight))
         JointPSM1PosCameraRight = LEFT_CAM_PSM1.GetPositionInCameraFrameList(JointPSM1Pos)
         KeyPointsPSM1Pixel = LEFT_CAM_PSM1.PixelProjectionList(KeyPointsPSM1PosCameraRight)
         gr_PSM1_pixel, gl_PSM1_pixel = KeyPointsPSM1Pixel[-2:]
@@ -246,18 +254,18 @@ if __name__ == "__main__":
         MatchedMeasurementPSM1Dict = dict(zip(MatchedNamePSM1List, MatchedValuePSM1List))
         JacobiansPSM1Dict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
-        # EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
-        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        T_cr1_new = EKF_obj1.ReturnTcrEstimation()
+        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         # AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
         # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
         # mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
         # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
-        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
+        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         ######################### Error Analysis 3d ############################################
         KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
@@ -267,7 +275,13 @@ if __name__ == "__main__":
         KP_3D_ERROR_LIST = [1e3*np.linalg.norm(KP_3D_CALIBRATED_SELECTED[i] - KP_3D_RECONSTRUCTED_SELECTED[i]) for i in range(len(KP_3D_CALIBRATED_SELECTED))]
         KP_3D_ERROR_DIC = dict(zip(MatchedNamePSM1List, KP_3D_ERROR_LIST))
 
-        if len(IndexMatched_PSM1) >= 4 and index >= 20:
+        KP_3D_PREDICTION_HIS[index] = KeyPointsPSM1PosCameraDic
+        KP_3D_MEASUREMENT_HIS[index] = dict(zip(MatchedNamePSM1List, KP_3D_RECONSTRUCTED_SELECTED))
+        KP_2D_PIXEL_PREDICTION_HIS[index] = KeyPointsPSM1PixelDic
+        KP_2D_PIXEL_MEASUREMENT_HIS[index] = MatchedMeasurementPSM1Dict
+        T_CR_HIS[index] = T_cr1_new.flatten()
+
+        if len(IndexMatched_PSM1) >= 4:
             PNP_PIXEL_LIST = [list(KP_UV_LABELLED_PSM1.values())[matched_id] for matched_id in IndexMatched_PSM1]
             PNP_OBJ_PTS_LIST = [KeyPointsPSM1Pos[key] for key in OutputMatchedKeys_PSM1 if key != None]
             Tcr_pnp = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
@@ -275,6 +289,7 @@ if __name__ == "__main__":
                 print("EPnP failednow")
             else:
                 # LEFT_CAM_PSM1.UpdateTcr(Tcr_pnp)
+                T_PNP_HIS[index] = Tcr_pnp.flatten()
                 print("EPnP indication now")
 
         # ##################### For PSM3 now ###########################################################################################
@@ -382,4 +397,28 @@ if __name__ == "__main__":
         if cv2.waitKey(10) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
 
+    print("End of the project")
+    # convert all dics into yaml writable form
+    KP_3D_PREDICTION_HIS = MakeNumDicWritable(KP_3D_PREDICTION_HIS)
+    KP_3D_MEASUREMENT_HIS = MakeNumDicWritable(KP_3D_MEASUREMENT_HIS)
+    KP_2D_PIXEL_PREDICTION_HIS = MakeNumDicWritable(KP_2D_PIXEL_PREDICTION_HIS)
+    KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(KP_2D_PIXEL_MEASUREMENT_HIS)
+    T_PNP_HIS = MakeNumDicWritable(T_PNP_HIS)
+    T_CR_HIS = MakeNumDicWritable(T_CR_HIS)
 
+    output_dir = os.path.join("/home/zc519/Projects/SuperPose_OTF", "AnalysisResults", dir_id)
+    os.makedirs(output_dir, exist_ok=True) 
+    os.chdir(output_dir)
+
+    with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
+        yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
+        yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
+        yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
+        yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
+        yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
+        yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
