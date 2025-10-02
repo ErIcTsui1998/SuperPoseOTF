@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000012"
+    dir_id = "000010"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -76,11 +76,6 @@ if __name__ == "__main__":
     D_left = np.array([-0.251655177510111, 0.503352413478258, -0.002139555248137, -0.004349153536928, -0.246027939563351])
     D_right = np.array([-0.257090786509171, 0.101341249569555, 0.0007793893931081916, 0.0007405068673525044, 2.505085264989695])
 
-    # After stereo calibration
-    K_left_rectified = np.array([[1.80328460e+03, 0.00000000e+00, 4.02347034e+02],
-                                 [0.00000000e+00, 1.80328460e+03, 4.59875984e+02],
-                                 [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]]) # With distortion
-
     LEFT_CAM_PSM1 = dvrk_camera(K_left, PSM1.T_cr_his[0])
     LEFT_CAM_PSM3 = dvrk_camera(K_left, PSM3.T_cr_his[0])
     RIGHT_CAM_PSM1 = dvrk_camera(K_right, PSM1.T_cr_his[0])
@@ -90,7 +85,7 @@ if __name__ == "__main__":
     T_cr3 = PSM3.T_cr_his[0]
     if "Tcr_psm1_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr1 = np.loadtxt("Tcr_psm1_500.txt")
+        T_cr1 = np.loadtxt("Tcr_psm1_1000.txt")
     if "Tcr_psm3_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
         T_cr3 = np.loadtxt("Tcr_psm3_100.txt")
@@ -139,7 +134,7 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*2e-4
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*5e-4
     cov_measure = np.array([25,25])
     forget_factor = 0.6
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
@@ -251,18 +246,18 @@ if __name__ == "__main__":
         MatchedMeasurementPSM1Dict = dict(zip(MatchedNamePSM1List, MatchedValuePSM1List))
         JacobiansPSM1Dict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
-        EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        T_cr1_new = EKF_obj1.ReturnTcrEstimation()
-        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        # EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
+        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         # AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
         # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
         # mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
         # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
-        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
+        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         ######################### Error Analysis 3d ############################################
         KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
