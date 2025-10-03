@@ -13,4 +13,4 @@ Evaluation criteria: 3D position for all labelled key points. <br>
 
 Modifications: <br>
 1. Assume that no labels are available, for double instruments detection. <br>
-
+2. Date: 3rd October. Gripper angles are availble now, and hence more keypoints can be used for analysis. <br>
