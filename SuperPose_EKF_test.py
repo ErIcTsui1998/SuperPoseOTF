@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000000"
+    dir_id = "000001"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -46,15 +46,18 @@ if __name__ == "__main__":
     KP_Left_file = os.path.join(SubDataSet, "keypoints_left.yaml")
     KP_right_file = os.path.join(SubDataSet, "keypoints_right.yaml")
     KP_left_3d_ground_file = os.path.join(SubDataSet, "keypoints_left_3d.yaml")
+    gripper_angle_file = os.path.join(SubDataSet, "gripper_angle.yaml")
     KP_labelled_left = {}
     KP_labelled_right = {}
     KP_left_3d_ground = {}
+    GripperAngle = {}
+    GripperAnglePSM1 = [] # list with no keys
+    GripperAnglePSM3 = [] # list with no keys
     with open(KP_Left_file) as stream:
         try:
             KP_labelled_left = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
-
     with open(KP_right_file) as stream:
         try:
             KP_labelled_right = yaml.safe_load(stream)
@@ -66,6 +69,18 @@ if __name__ == "__main__":
             KP_left_3d_ground = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
+    with open(gripper_angle_file) as stream:
+        try:
+            GripperAngle = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+    GripperAnglePSM1 = GripperAngle["PSM1"]
+    GripperAnglePSM1.insert(0,0.0)
+    assert len(GripperAnglePSM1) == n_images, "num of gripper angle for PSM1 mismatch"
+    GripperAnglePSM3 = GripperAngle["PSM3"]
+    GripperAnglePSM3.insert(0,0.0)
+    assert len(GripperAnglePSM3) == n_images, "num of gripper angle for PSM3  mismatch"
+
     # Camera Object Initialisation
     K_left = np.array([[1811.910046453570, 0.0, 588.5594517681759],
                        [0.0, 1809.640734154330, 477.3975900383616],
@@ -85,7 +100,7 @@ if __name__ == "__main__":
     T_cr3 = PSM3.T_cr_his[0]
     if "Tcr_psm1_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr1 = np.loadtxt("Tcr_psm1_1000.txt")
+        T_cr1 = np.loadtxt("Tcr_psm1_500.txt")
     if "Tcr_psm3_100.txt" in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
         T_cr3 = np.loadtxt("Tcr_psm3_100.txt")
@@ -102,14 +117,12 @@ if __name__ == "__main__":
     KeyPointsJointDic = {"rf":4, "rb":4, "rr":4, "rl":4, "pf":5, "pb":5, "pr":5, "pl":5, "ef":6, "eb":6, "gr":6, "gl":6}
     LabelDic = {1:"rf", 2:"pf", 3:"ef", 4:"gl", 5:"gr", 6:"pl", 7:"rl", 8:"rf", 9:"pf", 10:"ef", 11:"gl", 12:"gr", 13:"pr", 14:"rr"}
     
-    KeyPointsNamePSM1 = [item for item in KeyPointsName if "g" not in item] # everything excluding gripper tips, PSM1
-    KeyPointsNamePSM3 = [item for item in KeyPointsName if "g" not in item] # everything excluding gripper tips, PSM3
+    KeyPointsNamePSM1 = [item for item in KeyPointsName] # everything excluding gripper tips, PSM1
+    KeyPointsNamePSM3 = [item for item in KeyPointsName] # everything excluding gripper tips, PSM3
 
     # JCBB Initialisation
-    # LandmarkPSM1Name = ["rf","pf","ef","pl","rl"]
-    # LandmarkPSM1Name = ["rf","rb","rr","rl","pf","pb", "pr","pl","ef","eb"]
-    LandmarkPSM1Name = [item for item in KeyPointsName if "g" not in item]
-    LandmarkPSM3Name = [item for item in KeyPointsName if "g" not in item]
+    LandmarkPSM1Name = [item for item in KeyPointsName]
+    LandmarkPSM3Name = [item for item in KeyPointsName]
     LandmarkPSM1Value = list(range(len(LandmarkPSM1Name)))
     LandmarkPSM3Value = list(range(len(LandmarkPSM3Name)))
 
@@ -134,9 +147,9 @@ if __name__ == "__main__":
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*5e-4
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*8e-4
     cov_measure = np.array([25,25])
-    forget_factor = 0.6
+    forget_factor = 0.3
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
     AEKF_obj3 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, forget_factor)
 
@@ -164,14 +177,15 @@ if __name__ == "__main__":
         img_left = cv2.imread(img_name)
         os.chdir(RightImagesFolder)
         img_right = cv2.imread(img_name)
-        # KP_UV_LABELLED_NOW = KP_labelled_right[index]
         KP_UV_LABELLED_NOW = KP_labelled_left[index]
         KP_UV_3D_NOW = KP_left_3d_ground[index]
         ###############  start from PSM1 only ###########
         PSM1_js = PSM1.js_his[index]
-        alpha = 0.0
-        KeyPointsRelDic["gr"] = np.array([(9e-3)*np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), (9e-3)*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
-        KeyPointsRelDic["gl"] = np.array([-(6.5e-3)*np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), (6.5e-3)*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
+        alpha = GripperAnglePSM1[index]
+        l_gripper = 10.2 * 1e-3 # m
+        # l_gripper = 25.00 * 1e-3 # m
+        KeyPointsRelDic["gr"] = np.array([l_gripper*np.sin(alpha/2) + (0e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (0e-4)*np.sin(alpha/2), 0.0 ])
+        KeyPointsRelDic["gl"] = np.array([-l_gripper*np.sin(alpha/2) - (0e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (0e-4)*np.sin(alpha/2), 0.0 ])
         
         KeyPointsPSM1Pos = [GetPositionInBaseFrame(PSM1_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsNamePSM1]
         KeyPointsPSM1PosDic = dict(zip(KeyPointsNamePSM1, KeyPointsPSM1Pos))
@@ -192,7 +206,7 @@ if __name__ == "__main__":
         SkeletonPt_PSM1_list = [j1_pixel, j4_pixel, j5_pixel, j6_pixel, gr_PSM1_pixel, gl_PSM1_pixel]
         SkeletonLine_PSM1_list = GetListOfLineEquationFromPointSet([(j1_pixel,j4_pixel),(j5_pixel,j6_pixel), (j6_pixel,gm_PSM1pixel)])
 
-        overlay = LEFT_CAM_PSM1.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel)])
+        overlay = LEFT_CAM_PSM1.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gr_PSM1_pixel), (j6_pixel, gl_PSM1_pixel)])
         overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1)
 
         ########################### Visibility Test & Scores ############################################
@@ -202,13 +216,14 @@ if __name__ == "__main__":
         pe_part_evaluation = IsPointAbovelineList(KeyPointsPSM1Pixel[4:10], SkeletonLine_PSM1_list[1])
         pe_part_central_distance = GetPointToLineDistanceList(KeyPointsPSM1Pixel[4:10], SkeletonLine_PSM1_list[1])
 
-        overall_evaluation = roll_part_evaluation + pe_part_evaluation
-        overall_central_distance = roll_part_central_distance + pe_part_central_distance
+        # overall_evaluation = roll_part_evaluation + pe_part_evaluation
+        # overall_central_distance = roll_part_central_distance + pe_part_central_distance
 
-        # grip_part_evaluation = IsPointAbovelineList([gr_pixel, gl_pixel], SkeletonLine_list[2])
-        # grip_part_central_distance = GetPointToLineDistanceList([gr_pixel, gl_pixel], SkeletonLine_list[2])        
-        # overall_evaluation = roll_part_evaluation + pe_part_evaluation + grip_part_evaluation
-        # overall_central_distance = roll_part_central_distance + pe_part_central_distance + grip_part_central_distance
+        grip_part_evaluation = IsPointAbovelineList([gr_PSM1_pixel, gl_PSM1_pixel], SkeletonLine_PSM1_list[2])
+        grip_part_central_distance = GetPointToLineDistanceList([gr_PSM1_pixel, gl_PSM1_pixel], SkeletonLine_PSM1_list[2])        
+        
+        overall_evaluation = roll_part_evaluation + pe_part_evaluation + grip_part_evaluation
+        overall_central_distance = roll_part_central_distance + pe_part_central_distance + grip_part_central_distance
 
         Top_distance_list = GetPointToLineDistanceList(KeyPointsPSM1Pixel, Edges_PSM1[1])
         Down_distance_list = GetPointToLineDistanceList(KeyPointsPSM1Pixel, Edges_PSM1[0])
@@ -223,14 +238,13 @@ if __name__ == "__main__":
 
         # Draw keypoints and labels
         # KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key < 7 and key != 4 and key !=5}
-        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7 and key != 4 and key !=5}
+        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7}
         UV_KP_NAMES_PSM1 = list(KP_UV_LABELLED_PSM1.keys())
         UV_KP_NAMES_PSM1 = [str(item) for item in UV_KP_NAMES_PSM1]
         UV_KP_PIXELS_PSM1 = list(KP_UV_LABELLED_PSM1.values())
         UV_KP_PIXELS_PSM1 = [tuple(item) for item in UV_KP_PIXELS_PSM1]
 
-        KP_UV_3D_PSM1 = {LabelDic[key]: value for key, value in KP_UV_3D_NOW.items() if value != None and key <= 7 and key != 4 and key !=5}
-        UV_KP_3D_PSM1 = list(KP_UV_3D_PSM1.values())
+        KP_UV_3D_PSM1 = {key: value for key, value in KP_UV_3D_NOW.items() if value != None and key <= 7}
 
         overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, text_list=UV_KP_NAMES_PSM1, color = color_blue)
         overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPSM1Pixel, text_list=KeyPointsNamePSM1)
@@ -239,10 +253,9 @@ if __name__ == "__main__":
         JacobianValues_PSM1 = [JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr1, KeyPointsPSM1PosDic[name]) for name in KeyPointsNamePSM1]
         JacobiansInput_PSM1 = dict(zip(LandmarkPSM1Value, JacobianValues_PSM1))
         JCBB_obj1.ReadPredictedFeatureValues(KeyPointsPSM1Pixel, JacobiansInput_PSM1, JCBB_obj1_cov_state)
-        # JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure)
-        JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure, visibility_score_dic)
+        JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure)
+        # JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure, visibility_score_dic)
         OutputMatchedKeys_PSM1 = JCBB_obj1.ReturnMatchingKeys()
-        # OutputMatchedKeys = [LandmarkPSM1Dic[name] for name in UV_KP_NAMES_PSM1 if name in LandmarkPSM1Dic.keys()]
         JCBB_obj1.Clear()
         overlay = LEFT_CAM_PSM1.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM1, KeyPointsPSM1Pixel, OutputMatchedKeys_PSM1, color_blue)
 
@@ -269,9 +282,10 @@ if __name__ == "__main__":
 
         ######################### Error Analysis 3d ############################################
         KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
-        KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM1PosCameraRight[key] for key in OutputMatchedKeys_PSM1 if key != None]
+        # KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM1PosCameraRight[key] for key in OutputMatchedKeys_PSM1 if key != None]
+        KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM1PosCameraRight[OutputMatchedKeys_PSM1[id_match]] for id_match in IndexMatched_PSM1 if id_match+1 in KP_UV_3D_PSM1.keys()]
         # KP_3D_CALIBRATED_SELECTED = [KP_3D_CALIBRATED_LIST[key] for key in OutputMatchedKeys_PSM1 if key != None]
-        KP_3D_RECONSTRUCTED_SELECTED = [UV_KP_3D_PSM1[id_match] for id_match in IndexMatched_PSM1 if id_match != None]
+        KP_3D_RECONSTRUCTED_SELECTED = [KP_UV_3D_PSM1[id_match+1] for id_match in IndexMatched_PSM1 if id_match+1 in KP_UV_3D_PSM1.keys()]
         KP_3D_ERROR_LIST = [1e3*np.linalg.norm(KP_3D_CALIBRATED_SELECTED[i] - KP_3D_RECONSTRUCTED_SELECTED[i]) for i in range(len(KP_3D_CALIBRATED_SELECTED))]
         KP_3D_ERROR_DIC = dict(zip(MatchedNamePSM1List, KP_3D_ERROR_LIST))
 
@@ -410,15 +424,15 @@ if __name__ == "__main__":
     os.makedirs(output_dir, exist_ok=True) 
     os.chdir(output_dir)
 
-    with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
-        yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-    with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
-        yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-    with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
-        yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-    with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
-        yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-    with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
-        yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
-    with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
-        yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
+    # with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
+    #     yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    # with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
+    #     yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    # with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
+    #     yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    # with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
+    #     yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    # with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
+    #     yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
+    # with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
+    #     yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
