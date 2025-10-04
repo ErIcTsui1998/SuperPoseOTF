@@ -58,7 +58,7 @@ class JCBB:
         
         InvisibleKeyList = []
         if visibility_score_dic is not None:
-            InvisibleKeyList =[key for key, value in visibility_score_dic.items() if value <=1e-3]
+            InvisibleKeyList =[key for key, value in visibility_score_dic.items() if value <=1e-3 and "g" not in self.LandmarkDic[key]]
 
         for i in range(n_measurements):
             self.__Innovations.append([])

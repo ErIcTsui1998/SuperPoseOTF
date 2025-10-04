@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000001"
+    dir_id = "000013"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -141,15 +141,15 @@ if __name__ == "__main__":
     # EKF Initialisation
     mean_state = np.zeros(6)
     cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*1e-3
-    cov_measure = np.array([50,50])
+    cov_measure = np.array([10,10])
     EKF_obj1 = EKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1)
     EKF_obj3 = EKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3)
 
     # AEKF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*8e-4
-    cov_measure = np.array([25,25])
-    forget_factor = 0.3
+    cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*1e-3
+    cov_measure = np.array([10,10])
+    forget_factor = 0.15
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
     AEKF_obj3 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, forget_factor)
 
@@ -182,8 +182,9 @@ if __name__ == "__main__":
         ###############  start from PSM1 only ###########
         PSM1_js = PSM1.js_his[index]
         alpha = GripperAnglePSM1[index]
-        l_gripper = 10.2 * 1e-3 # m
+        # l_gripper = 10.2 * 1e-3 # m
         # l_gripper = 25.00 * 1e-3 # m
+        l_gripper = 13.2 * 1e-3 # m
         KeyPointsRelDic["gr"] = np.array([l_gripper*np.sin(alpha/2) + (0e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (0e-4)*np.sin(alpha/2), 0.0 ])
         KeyPointsRelDic["gl"] = np.array([-l_gripper*np.sin(alpha/2) - (0e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (0e-4)*np.sin(alpha/2), 0.0 ])
         
@@ -253,8 +254,8 @@ if __name__ == "__main__":
         JacobianValues_PSM1 = [JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr1, KeyPointsPSM1PosDic[name]) for name in KeyPointsNamePSM1]
         JacobiansInput_PSM1 = dict(zip(LandmarkPSM1Value, JacobianValues_PSM1))
         JCBB_obj1.ReadPredictedFeatureValues(KeyPointsPSM1Pixel, JacobiansInput_PSM1, JCBB_obj1_cov_state)
-        JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure)
-        # JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure, visibility_score_dic)
+        # JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure)
+        JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure, visibility_score_dic)
         OutputMatchedKeys_PSM1 = JCBB_obj1.ReturnMatchingKeys()
         JCBB_obj1.Clear()
         overlay = LEFT_CAM_PSM1.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM1, KeyPointsPSM1Pixel, OutputMatchedKeys_PSM1, color_blue)
@@ -267,14 +268,14 @@ if __name__ == "__main__":
         MatchedMeasurementPSM1Dict = dict(zip(MatchedNamePSM1List, MatchedValuePSM1List))
         JacobiansPSM1Dict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
-        EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        T_cr1_new = EKF_obj1.ReturnTcrEstimation()
-        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
-
-        # AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
-        # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
-        # mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
+        # EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
         # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+
+        AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
+        T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
+        mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
+        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
         # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()

@@ -15,6 +15,7 @@ class AEKF_SuperDataSet:
         self.__T00 = np.identity(4)
         measure_cov = measure_cov_init if len(measure_cov_init.shape) == 2 else np.diag(measure_cov_init) # 2*2 for pixels
         self.__measure_cov_dic = {name: measure_cov for name in KeyPointsNameList}
+        self.__measure_cov = measure_cov
         self.__alpha = alpha # forget factor
         self.__R = np.zeros(self.__state_cov.shape)
         self.__kp_name_list = KeyPointsNameList
@@ -45,31 +46,38 @@ class AEKF_SuperDataSet:
         ResidualDic = {key: np.array(MeasurementDic[key]) - np.array(PredictionDic_tmp[key]) for key in MeasurementDic.keys()}
         
         JacobianDic = {name: JacobianCalculatorImage(K, np.zeros(3), np.zeros(3), Tcr_tmp, KeyPointsPSMDic[name]) for name in MeasurementDic.keys()}
-        state_cov_candidate = self.__state_cov + self.__R # 6 by 6
+        state_cov_prior = self.__state_cov + self.__R # 6 by 6
         state_mean_candidate = self.__state_mean
         R_candidate = self.__alpha * self.__R # 6*6
+        measure_cov_candidate = self.__alpha * self.__measure_cov
         for name in MeasurementDic.keys():
             # Measurement Covariance Update
-            measure_cov_pre = self.__measure_cov_dic[name] # 2 by 2
+            # measure_cov_pre = self.__measure_cov_dic[name] # 2 by 2
+
             H = JacobianDic[name] # 2 by 6
             residual = ResidualDic[name].reshape(-1,1) # 2 by 1
-            measure_cov_new = self.__alpha * measure_cov_pre + (1-self.__alpha) * (residual@residual.T + H@state_cov_candidate@H.T)
+            # measure_cov_new = self.__alpha * measure_cov_pre + (1-self.__alpha) * (residual@residual.T + H@state_cov_prior@H.T)
+            measure_cov_new = self.__alpha * self.__measure_cov + (1-self.__alpha) * (residual@residual.T + H@state_cov_prior@H.T)
+            measure_cov_candidate = measure_cov_candidate + (1-self.__alpha) * (residual@residual.T + H@state_cov_prior@H.T)
+
             self.__measure_cov_dic[name] = measure_cov_new # measurement cov update
 
             # Kalman Gain update
-            S = np.matmul(np.matmul(H, state_cov_candidate), H.T) + measure_cov_new
-            K = state_cov_candidate @ H.T @ np.linalg.inv(S)
+            S = np.matmul(np.matmul(H, state_cov_prior), H.T) + measure_cov_new
+            K = state_cov_prior @ H.T @ np.linalg.inv(S)
             innovation = InnovationDic[name].reshape(-1,1)
             state_mean_candidate = state_mean_candidate + (K @ innovation).ravel()
 
             # State Covariance Update
             KH = K @ H
             mat1 = np.identity(KH.shape[0]) - KH
-            state_cov_candidate = mat1 @ state_cov_candidate
+            # state_cov_candidate = mat1 @ state_cov_candidate
+            state_cov_candidate = mat1 @ self.__state_cov
             R_candidate = R_candidate + (1-self.__alpha)*K@innovation@innovation.T@K.T
 
         self.__state_mean = state_mean_candidate.copy()
         self.__state_cov = state_cov_candidate.copy()
+        self.__measure_cov = measure_cov_candidate.copy()
         self.__R = R_candidate.copy()
         self.__T00 = TFromThetaVecTVec(self.__state_mean[:3], self.__state_mean[3:])
         self.__Tcr = self.__Tcr_init @ self.__T00
