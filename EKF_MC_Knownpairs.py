@@ -1,6 +1,6 @@
 # Implementation of Extended Kalman Filter under Maximum Correntropy Criterion
 # Author: Zejian Cui
-# Relevant paper link: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7727408 
+# Relevant paper link: https://ieeexplore.ieee.org/abstract/document/8736038 
 # Date: 18/09/2025
 # Notes: All parameter notations in this script conform to what was presribed in the original paper
 import numpy as np
@@ -14,6 +14,7 @@ class EKF_MC_dVRKDataSet:
         # self.__measure_cov = measure_cov_init # 2*2 for pixels
         measure_cov = measure_cov_init if len(measure_cov_init.shape) == 2 else np.diag(measure_cov_init) # 2*2 for pixels
         self.__measure_cov_dic = {name: measure_cov for name in KeyPointsNameList}
+        self.__measure_cov = measure_cov
         self.__Tcr_init = Tcr_init
         self.__Tcr = Tcr_init
         self.__T00 = np.identity(4)
@@ -25,7 +26,7 @@ class EKF_MC_dVRKDataSet:
         state_mean_candidate = self.__state_mean.copy()
         state_cov_candidate = self.__state_cov.copy()
         n_state_param = len(state_mean_candidate) # 6 by default
-        
+
         if len(state_cov_candidate.shape) == 1:
             state_cov_candidate = np.diag(state_cov_candidate)
 
@@ -34,39 +35,48 @@ class EKF_MC_dVRKDataSet:
             return
         
         for index, measurement in MeasurementDic.items():
-            measurement_cov = self.__measure_cov_dic[index]
+            measurement_cov = self.__measure_cov
             n_measure_param = measurement_cov.shape[0] # 2 by default
-            Bp = np.linalg.cholesky(state_cov_candidate)
-            Br = np.linalg.cholesky(measurement_cov)
-            B = DiagMergeMats([Bp, Br]) # 6+2 by 6+2
-            H = JacobianDic[index] # 2*6 matrix
-            mat1 = np.vstack((np.identity(n_state_param) ,H)) # 6+2 by 6, by default
-            W = np.linalg.inv(B) @ mat1 # 6+2 by 6
+            H = JacobianDic[index] # 2*6 matrix          
             prediction = PredictionDic[index]
             m1 = np.array(measurement)
             p1 = np.array(prediction)
-            error = m1 - p1 # 2 by 1
-            vec1 = np.append(state_mean_candidate, measurement)
-            d_vec = np.linalg.inv(B) @ vec1 # (6+2 by 1 vector)
-            e_vec = d_vec - W @ state_mean_candidate # 6+2 by 1 vector
-            sigma_obs_list = [self.__GK(e_vec[ii]) for ii in range(n_state_param, n_state_param + n_measure_param)]
-            sigma_state_list = [self.__GK(e_vec[ii]) for ii in range(0, n_state_param)]
-            C_obs = np.diag(sigma_obs_list)
-            C_state = np.diag(sigma_state_list)
-            R = Br @ np.linalg.inv(C_obs) @ Br.T
-            P = Bp @ np.linalg.inv(C_state) @ Bp.T
-            S = H @ P @ H.T + R
-            K = P @ H.T @ np.linalg.inv(S)
-            KH = K @ H
-            mat1 = np.identity(KH.shape[0]) - KH
-            state_mean_candidate_potential = state_mean_candidate + K @ error
-            distance = np.linalg.norm(state_mean_candidate_potential - state_mean_candidate) / np.linalg.norm(state_mean_candidate)
+            psi = m1 - p1 # 2 by 1
+            eta = H @ state_cov_candidate @ H.T + measurement_cov
+            beta = psi.T @ np.linalg.inv(eta) @ psi
 
-            state_mean_candidate = state_mean_candidate_potential
-            state_cov_candidate = mat1 @ state_cov_candidate @ mat1.T + K @ R @ K.T
-            # state_cov_candidate = mat1 @ state_cov_candidate
-            self.__measure_cov_dic[index] = R
+            # Initalisation before iteration
+            state_mean_candidate_itr = state_mean_candidate.copy()
+            state_cov_candidate_itr = state_cov_candidate.copy()
+            distance = np.inf
 
+            # Iteration block
+            while distance >= 1e-7:
+                Mp = np.linalg.cholesky(state_cov_candidate)
+                Mr = np.linalg.cholesky(measurement_cov)
+                M = DiagMergeMats([Mp, Mr]) # 6+2 by 6+2
+                mat1 = np.vstack((np.identity(n_state_param) ,H)) # 6+2 by 6, by default
+                D = np.linalg.inv(M) @ mat1 # 6+2 by 6
+                vec1 = np.append(state_mean_candidate, psi + H @ state_mean_candidate)
+                z_vec = np.linalg.inv(M) @ vec1 # (6+2 by 1 vector)
+                e_vec = z_vec - D @ state_mean_candidate_itr # 6+2 by 1 vector
+                sigma_obs_list = [self.__GK(e_vec[ii]) for ii in range(n_state_param, n_state_param + n_measure_param)]
+                sigma_state_list = [self.__GK(e_vec[ii]) for ii in range(0, n_state_param)]
+                C_obs = np.diag(sigma_obs_list)
+                C_state = np.diag(sigma_state_list)
+                R = Mr @ np.linalg.inv(C_obs) @ Mr.T
+                P = Mp @ np.linalg.inv(C_state) @ Mp.T
+                S = H @ P @ H.T + R
+                K = P @ H.T @ np.linalg.inv(S)
+                KH = K @ H
+                mat1 = np.identity(KH.shape[0]) - KH
+                distance = np.linalg.norm(state_mean_candidate + K @ psi - state_mean_candidate_itr) / np.linalg.norm(state_mean_candidate_itr)
+                state_mean_candidate_itr = state_mean_candidate + K @ psi
+                state_cov_candidate_itr = mat1 @ state_cov_candidate @ mat1.T + K @ R @ K.T
+                # state_cov_candidate_itr = mat1 @ state_cov_candidate
+                print(f"distance is {distance}")
+            state_mean_candidate = state_mean_candidate_itr
+            state_cov_candidate = state_cov_candidate_itr
         
         self.__state_mean = state_mean_candidate.copy()
         self.__state_cov = state_cov_candidate.copy()

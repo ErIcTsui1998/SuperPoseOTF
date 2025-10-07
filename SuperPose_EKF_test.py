@@ -17,7 +17,7 @@ from Illustration import DynamicDrawThreeLines
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000013"
+    dir_id = "000019"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -155,10 +155,10 @@ if __name__ == "__main__":
 
     # EKF MC Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*6e-4
+    cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*1e-3
     cov_measure = np.array([25,25])
-    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=10)
-    EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=10)
+    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=100)
+    EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=100)
 
     color_pink = (255,141,161)
     color_blue = (255,0,0)
@@ -272,14 +272,14 @@ if __name__ == "__main__":
         # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
         # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
-        T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
-        mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
-        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
-
-        # EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        # T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
+        # AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
+        # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
+        # mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
         # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+
+        EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+        T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
+        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
         ######################### Error Analysis 3d ############################################
         KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
