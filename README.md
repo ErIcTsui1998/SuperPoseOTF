@@ -14,3 +14,6 @@ Evaluation criteria: 3D position for all labelled key points. <br>
 Modifications: <br>
 1. Assume that no labels are available, for double instruments detection. <br>
 2. Date: 3rd October. Gripper angles are availble now, and hence more keypoints can be used for analysis. <br>
+
+Notes: <br>
+1. The EKF MC method is barely useful in that when sigma is chosen as a small value, singularity error is flagged. However, when large sigma values are selected, the correction is not effective, because error kernel values are close to 1 (saturation).  
