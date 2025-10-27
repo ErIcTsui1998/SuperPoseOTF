@@ -16,7 +16,8 @@ def PixelProjection(position_camera, K):
 def IsPointAboveLine(pt_pixel, line_equation):
     u, v = pt_pixel
     A,B,C = line_equation
-    if A*u + B*v + C >= 0:
+    v_line = (-C-A*u)/B
+    if v<= v_line:
         return True
     else:
         return False

@@ -14,10 +14,18 @@ from EKF_Knownpairs import EKF_SuperDataSet
 from AEKF_Knownpairs import AEKF_SuperDataSet
 from EKF_MC_Knownpairs import EKF_MC_dVRKDataSet
 from Illustration import DynamicDrawThreeLines
+from PF_Knownpairs import PF_SuperDataSet
+from time import time
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000019"
+    dir_id = "000021"
+    # Determine Filtermode "EKF", "PF", "AEKF"
+    FilterMode = "EKF"    
+
+    l_gripper = 9.0 * 1e-3 # m
+    # l_gripper = 25.00 * 1e-3 # m
+    # l_gripper = 13.2 * 1e-3 # m
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()
@@ -149,16 +157,17 @@ if __name__ == "__main__":
     mean_state = np.zeros(6)
     cov_state = np.diag([0.005, 0.005, 0.005, 0.25e-3, 0.25e-3, 0.25e-3])*1e-3
     cov_measure = np.array([10,10])
-    forget_factor = 0.15
+    forget_factor = 0.5
     AEKF_obj1 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, forget_factor)
     AEKF_obj3 = AEKF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, forget_factor)
 
-    # EKF MC Initialisation
+    # PF Initialisation
     mean_state = np.zeros(6)
-    cov_state = np.diag([0.007, 0.007, 0.007, 0.25e-3, 0.25e-3, 0.25e-3])*1e-3
-    cov_measure = np.array([25,25])
-    EKF_MC_OBJ1 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr1, LandmarkPSM1Name, bandwidth=5)
-    EKF_MC_OBJ3 = EKF_MC_dVRKDataSet(mean_state, cov_state, cov_measure, T_cr3, LandmarkPSM3Name, bandwidth=5)
+    cov_state = np.diag([0.05, 0.05, 0.05, 0.1, 0.1, 0.1])
+    cov_measure = np.array([15,15])
+    N_particles = 1000
+    PF_OBJ1 = PF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr1, N_particles)
+    PF_OBJ3 = PF_SuperDataSet(mean_state, cov_state, cov_measure, T_cr3, N_particles)
 
     color_pink = (255,141,161)
     color_blue = (255,0,0)
@@ -170,6 +179,8 @@ if __name__ == "__main__":
     KP_2D_PIXEL_MEASUREMENT_HIS = {}
     T_PNP_HIS = {}
     T_CR_HIS = {}
+    TIME_JCBB_HIS = {}
+    TIME_FILTER_HIS = {}
 
     for index in range(n_images):
         img_name = "frame" + str(index) + ".png"
@@ -182,11 +193,9 @@ if __name__ == "__main__":
         ###############  start from PSM1 only ###########
         PSM1_js = PSM1.js_his[index]
         alpha = GripperAnglePSM1[index]
-        # l_gripper = 10.2 * 1e-3 # m
-        # l_gripper = 25.00 * 1e-3 # m
-        l_gripper = 13.2 * 1e-3 # m
-        KeyPointsRelDic["gr"] = np.array([l_gripper*np.sin(alpha/2) + (0e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (0e-4)*np.sin(alpha/2), 0.0 ])
-        KeyPointsRelDic["gl"] = np.array([-l_gripper*np.sin(alpha/2) - (0e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (0e-4)*np.sin(alpha/2), 0.0 ])
+
+        KeyPointsRelDic["gr"] = np.array([l_gripper*np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
+        KeyPointsRelDic["gl"] = np.array([-l_gripper*np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), l_gripper*np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
         
         KeyPointsPSM1Pos = [GetPositionInBaseFrame(PSM1_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsNamePSM1]
         KeyPointsPSM1PosDic = dict(zip(KeyPointsNamePSM1, KeyPointsPSM1Pos))
@@ -207,23 +216,24 @@ if __name__ == "__main__":
         SkeletonPt_PSM1_list = [j1_pixel, j4_pixel, j5_pixel, j6_pixel, gr_PSM1_pixel, gl_PSM1_pixel]
         SkeletonLine_PSM1_list = GetListOfLineEquationFromPointSet([(j1_pixel,j4_pixel),(j5_pixel,j6_pixel), (j6_pixel,gm_PSM1pixel)])
 
-        overlay = LEFT_CAM_PSM1.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gr_PSM1_pixel), (j6_pixel, gl_PSM1_pixel)])
-        overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1)
+        overlay = LEFT_CAM_PSM1.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gr_PSM1_pixel), (j6_pixel, gl_PSM1_pixel)], thickness=4)
+        overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1, thickness=4)
+        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, [j4_pixel, j6_pixel, gl_PSM1_pixel, gr_PSM1_pixel],color=(0,255,0), radius=8)
 
         ########################### Visibility Test & Scores ############################################
         roll_part_evaluation = IsPointAbovelineList(KeyPointsPSM1Pixel[:4], SkeletonLine_PSM1_list[0])
+        roll_part_above_edge1_evaluation = IsPointAbovelineList(KeyPointsPSM1Pixel[:4], Edges_PSM1[1])
         roll_part_central_distance = GetPointToLineDistanceList(KeyPointsPSM1Pixel[:4], SkeletonLine_PSM1_list[0])
-        
+        IsEdge1PSM1Above = roll_part_above_edge1_evaluation.count(False) > roll_part_above_edge1_evaluation.count(True)
+
         pe_part_evaluation = IsPointAbovelineList(KeyPointsPSM1Pixel[4:10], SkeletonLine_PSM1_list[1])
         pe_part_central_distance = GetPointToLineDistanceList(KeyPointsPSM1Pixel[4:10], SkeletonLine_PSM1_list[1])
-
-        # overall_evaluation = roll_part_evaluation + pe_part_evaluation
-        # overall_central_distance = roll_part_central_distance + pe_part_central_distance
 
         grip_part_evaluation = IsPointAbovelineList([gr_PSM1_pixel, gl_PSM1_pixel], SkeletonLine_PSM1_list[2])
         grip_part_central_distance = GetPointToLineDistanceList([gr_PSM1_pixel, gl_PSM1_pixel], SkeletonLine_PSM1_list[2])        
         
         overall_evaluation = roll_part_evaluation + pe_part_evaluation + grip_part_evaluation
+        overall_evaluation = [item and IsEdge1PSM1Above for item in overall_evaluation]
         overall_central_distance = roll_part_central_distance + pe_part_central_distance + grip_part_central_distance
 
         Top_distance_list = GetPointToLineDistanceList(KeyPointsPSM1Pixel, Edges_PSM1[1])
@@ -234,6 +244,7 @@ if __name__ == "__main__":
         visibility_score = VisibilityEvaluation(overall_evaluation, overall_central_distance, Side_distance_list, KeyPointsNamePSM1)
         if len(visibility_score) > 0:
             visibility_score = [round(visibility_score[i],2) for i in range(len(KeyPointsPSM1Pixel))]
+            # visibility_score[-2:] = 1.0, 1.0 # Two grippers are always visible
             visibility_score_dic = dict(zip(LandmarkPSM1Value, visibility_score))
         #########################################################################################################################
 
@@ -247,18 +258,29 @@ if __name__ == "__main__":
 
         KP_UV_3D_PSM1 = {key: value for key, value in KP_UV_3D_NOW.items() if value != None and key <= 7}
 
-        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, text_list=UV_KP_NAMES_PSM1, color = color_blue)
-        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPSM1Pixel, text_list=KeyPointsNamePSM1)
+        # Draw visible key points only
+        VisibleKeyPointsPSM1Pixel = [KeyPointsPSM1Pixel[kk] for kk in np.where(visibility_score)[0]]
+        VisibleKeyPointsPSM1Name = [KeyPointsName[kk] for kk in np.where(visibility_score)[0]]        
+        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, VisibleKeyPointsPSM1Pixel,text_list=VisibleKeyPointsPSM1Name, radius=9)
+        # cv2.imshow("overlay_visible", overlay_visible)
+        # cv2.waitKey(0)
+
+        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, radius=9, color=(0,255,255))
+        # overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPSM1Pixel, text_list=KeyPointsNamePSM1)
 
         # JCBB data association using Jacobian 
         JacobianValues_PSM1 = [JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr1, KeyPointsPSM1PosDic[name]) for name in KeyPointsNamePSM1]
         JacobiansInput_PSM1 = dict(zip(LandmarkPSM1Value, JacobianValues_PSM1))
+        
+        time_JCBB_start = time()
         JCBB_obj1.ReadPredictedFeatureValues(KeyPointsPSM1Pixel, JacobiansInput_PSM1, JCBB_obj1_cov_state)
         # JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure)
         JCBB_obj1.ReadMeasurementFeatureValues(UV_KP_PIXELS_PSM1, JCBB_obj1_cov_measure, visibility_score_dic)
         OutputMatchedKeys_PSM1 = JCBB_obj1.ReturnMatchingKeys()
+        
+        time_JCBB_end = time()
         JCBB_obj1.Clear()
-        overlay = LEFT_CAM_PSM1.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM1, KeyPointsPSM1Pixel, OutputMatchedKeys_PSM1, color_blue)
+        overlay = LEFT_CAM_PSM1.DrawKeyPointsAssociation(overlay, UV_KP_PIXELS_PSM1, KeyPointsPSM1Pixel, OutputMatchedKeys_PSM1, (255,0,0), thickness=4)
 
         ##################################### EKF/PF with known data associations block ################################################
         KeyPointsPSM1PixelDic = dict(zip(KeyPointsNamePSM1, KeyPointsPSM1Pixel))
@@ -268,18 +290,27 @@ if __name__ == "__main__":
         MatchedMeasurementPSM1Dict = dict(zip(MatchedNamePSM1List, MatchedValuePSM1List))
         JacobiansPSM1Dict = dict(zip(KeyPointsNamePSM1, JacobianValues_PSM1))
         
-        # EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        # T_cr1_new = EKF_obj1.ReturnTcrEstimation()
-        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        time_FILTER_start = time()
 
-        # AEKF_obj1.AEKFReadMeasurement(KeyPointsPSM1PosDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, K_left)
-        # T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
-        # mean_state_PSM1, cov_state_PSM1 = AEKF_obj1.ReturnStateEstimation()
-        # LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        if FilterMode == "EKF":
+            EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+            T_cr1_new = EKF_obj1.ReturnTcrEstimation()
+            LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
-        EKF_MC_OBJ1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
-        T_cr1_new = EKF_MC_OBJ1.ReturnTcrEstimation()
-        LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+        if FilterMode == "AEKF":
+            AEKF_obj1.AEKFReadMeasurement(MatchedMeasurementPSM1Dict, KeyPointsPSM1PosDic, K_left)
+            T_cr1 = AEKF_obj1.ReturnTcrEstimation()
+            JCBB_obj1_cov_state = 5e2 * AEKF_obj1.ReturnStateEstimation()[1]
+            JCBB_obj1_cov_measure = AEKF_obj1.ReturnCovMeasureEstimation()
+            LEFT_CAM_PSM1.UpdateTcr(T_cr1)
+
+        if FilterMode == "PF":
+            PF_OBJ1.PFReadMeasurement(MatchedMeasurementPSM1Dict, KeyPointsPSM1PosDic, K_left)
+            PF_OBJ1.ParticleResampling()
+            T_cr1 = PF_OBJ1.ReturnTcrEstimation()
+            LEFT_CAM_PSM1.UpdateTcr(T_cr1)
+
+        time_FILTER_end = time()
 
         ######################### Error Analysis 3d ############################################
         KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
@@ -294,7 +325,9 @@ if __name__ == "__main__":
         KP_3D_MEASUREMENT_HIS[index] = dict(zip(MatchedNamePSM1List, KP_3D_RECONSTRUCTED_SELECTED))
         KP_2D_PIXEL_PREDICTION_HIS[index] = KeyPointsPSM1PixelDic
         KP_2D_PIXEL_MEASUREMENT_HIS[index] = MatchedMeasurementPSM1Dict
-        T_CR_HIS[index] = T_cr1_new.flatten()
+        T_CR_HIS[index] = T_cr1.flatten()
+        TIME_JCBB_HIS[index] = time_JCBB_end - time_JCBB_start
+        TIME_FILTER_HIS[index] = time_FILTER_end - time_FILTER_start
 
         if len(IndexMatched_PSM1) >= 4:
             PNP_PIXEL_LIST = [list(KP_UV_LABELLED_PSM1.values())[matched_id] for matched_id in IndexMatched_PSM1]
@@ -421,19 +454,23 @@ if __name__ == "__main__":
     T_PNP_HIS = MakeNumDicWritable(T_PNP_HIS)
     T_CR_HIS = MakeNumDicWritable(T_CR_HIS)
 
-    output_dir = os.path.join("/home/zc519/Projects/SuperPose_OTF", "AnalysisResults", dir_id)
+    output_dir = os.path.join("/home/zc519/Projects/SuperPose_OTF", "AnalysisResults", dir_id, FilterMode)
     os.makedirs(output_dir, exist_ok=True) 
     os.chdir(output_dir)
 
-    # with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
-    #     yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-    # with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
-    #     yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-    # with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
-    #     yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-    # with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
-    #     yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-    # with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
-    #     yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
-    # with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
-    #     yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
+        yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
+        yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
+        yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
+        yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
+        yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
+        yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "TIME_JCBB_HIS.yaml"), "w") as f:
+        yaml.dump(TIME_JCBB_HIS, f, default_flow_style=False, sort_keys=False)
+    with open(os.path.join(output_dir, "TIME_FILTER_HIS.yaml"), "w") as f:
+        yaml.dump(TIME_FILTER_HIS, f, default_flow_style=False, sort_keys=False)
