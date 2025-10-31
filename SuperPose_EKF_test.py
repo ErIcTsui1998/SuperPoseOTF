@@ -17,7 +17,7 @@ from time import time
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000001"
+    dir_id = "000030"
     # Determine Filtermode "EKF", "PF", "AEKF"
     FilterMode = "PF"    
     VScheck = True
@@ -210,6 +210,9 @@ if __name__ == "__main__":
         img_right = cv2.imread(img_name)
         KP_UV_LABELLED_NOW = KP_labelled_left[index]
         KP_UV_3D_NOW = KP_left_3d_ground[index]
+        MutualKeys = set(list(KP_UV_LABELLED_NOW.keys())) & set(list(KP_UV_3D_NOW.keys()))
+        KP_UV_LABELLED_NOW = {key:KP_UV_LABELLED_NOW[key] for key in MutualKeys}
+        KP_UV_3D_NOW = {key:KP_UV_3D_NOW[key] for key in MutualKeys}
         overlay = img_left.copy() # to be commented
 
         # ###############  start from PSM1 only ###########
@@ -345,7 +348,7 @@ if __name__ == "__main__":
             
             KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM1PosCameraRight[OutputMatchedKeys_PSM1[id_match]] for id_match in IndexMatched_PSM1 if id_match+1 in KP_UV_3D_PSM1.keys()]
            
-            KP_3D_RECONSTRUCTED_SELECTED = [list(KP_UV_3D_PSM1.values())[id_match] for id_match in IndexMatched_PSM1]
+            KP_3D_RECONSTRUCTED_SELECTED = [list(KP_UV_3D_PSM1.values())[IndexMatched_PSM1[i]] for i in range(len(IndexMatched_PSM1))]
             KP_3D_ERROR_LIST = [1e3*np.linalg.norm(KP_3D_CALIBRATED_SELECTED[i] - KP_3D_RECONSTRUCTED_SELECTED[i]) for i in range(len(KP_3D_CALIBRATED_SELECTED))]
             KP_3D_ERROR_DIC = dict(zip(MatchedNamePSM1List, KP_3D_ERROR_LIST))
 
@@ -503,9 +506,11 @@ if __name__ == "__main__":
 
             PSM3_KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM3.GetPositionInCameraFrameList(KeyPointsPSM3Pos)
             # KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM1PosCameraRight[key] for key in OutputMatchedKeys_PSM1 if key != None]
-            PSM3_KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM3PosCameraRight[OutputMatchedKeys_PSM3[id_match]] for id_match in IndexMatched_PSM3 if id_match+1 in KP_UV_3D_PSM3.keys()]
+            # PSM3_KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM3PosCameraRight[OutputMatchedKeys_PSM3[id_match]] for id_match in IndexMatched_PSM3 if id_match+1 in KP_UV_3D_PSM3.keys()]
+            PSM3_KP_3D_CALIBRATED_SELECTED = [KeyPointsPSM3PosCameraRight[KeyPointsNamePSM3.index(key)] for key in MatchedMeasurementPSM3Dict.keys() if len(MatchedMeasurementPSM3Dict) > 0]
             # KP_3D_CALIBRATED_SELECTED = [KP_3D_CALIBRATED_LIST[key] for key in OutputMatchedKeys_PSM1 if key != None]
             PSM3_KP_3D_RECONSTRUCTED_SELECTED = [list(KP_UV_3D_PSM3.values())[id_match] for id_match in IndexMatched_PSM3]
+            
             PSM3_KP_3D_ERROR_LIST = [1e3*np.linalg.norm(PSM3_KP_3D_CALIBRATED_SELECTED[i] - PSM3_KP_3D_RECONSTRUCTED_SELECTED[i]) for i in range(len(PSM3_KP_3D_CALIBRATED_SELECTED))]
             PSM3_KP_3D_ERROR_DIC = dict(zip(MatchedNamePSM3List, PSM3_KP_3D_ERROR_LIST))
 
