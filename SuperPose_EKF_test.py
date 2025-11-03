@@ -17,10 +17,11 @@ from time import time
 
 if __name__ == "__main__":    
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    dir_id = "000030"
+    dir_id = "000007"
     # Determine Filtermode "EKF", "PF", "AEKF"
-    FilterMode = "PF"    
+    FilterMode = "EKF"    
     VScheck = True
+    InitCalibFrame = 100
     ArmSelection = ['PSM1', 'PSM3']
 
     l_gripper_PSM1 = 9.0 * 1e-3 # m
@@ -108,14 +109,19 @@ if __name__ == "__main__":
     T_cr1 = PSM1.T_cr_his[0]
     T_cr3 = PSM3.T_cr_his[0]
 
-    if "Tcr_psm1_100.txt" in os.listdir(SubDataSet+"/HandEye"):
+
+    Tcr_psm1_file_name = "Tcr_psm1_"+ str(InitCalibFrame) + ".txt"
+    Tcr_psm3_file_name = "Tcr_psm3_"+ str(InitCalibFrame) + ".txt"
+    if Tcr_psm1_file_name in os.listdir(SubDataSet+"/HandEye"):
         os.chdir(SubDataSet+"/HandEye")
-        T_cr1 = np.loadtxt("Tcr_psm1_500.txt")
-    if "Tcr_psm3_10.txt" in os.listdir(SubDataSet+"/HandEye"):
-        os.chdir(SubDataSet+"/HandEye")
-        T_cr3 = np.loadtxt("Tcr_psm3_10.txt")
+        T_cr1 = np.loadtxt(Tcr_psm1_file_name)
     else:
-        raise "no Tcr_psm3_10.txt"
+        raise "no Tcr_psm1.txt"
+    if Tcr_psm3_file_name in os.listdir(SubDataSet+"/HandEye"):
+        os.chdir(SubDataSet+"/HandEye")
+        T_cr3 = np.loadtxt(Tcr_psm3_file_name)
+    else:
+        raise "no Tcr_psm3.txt"
 
     T_cr1_new = T_cr1.copy()
     T_cr3_new = T_cr3.copy()
@@ -556,9 +562,10 @@ if __name__ == "__main__":
         T_CR_HIS = MakeNumDicWritable(T_CR_HIS)
 
         if VScheck:
-            output_dir = os.path.join(output_dir_base,"PSM1", "WithVS")
+            output_dir = os.path.join(output_dir_base,"PSM1", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
         else:
-            output_dir = os.path.join(output_dir_base,"PSM1", "WithoutVS")
+            output_dir = os.path.join(output_dir_base,"PSM1", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
+        
         os.makedirs(os.path.join(output_dir), exist_ok=True) 
 
         with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
@@ -588,9 +595,9 @@ if __name__ == "__main__":
         PSM3_T_CR_HIS = MakeNumDicWritable(PSM3_T_CR_HIS)
         
         if VScheck:
-            output_dir = os.path.join(output_dir_base,"PSM3", "WithVS")
+            output_dir = os.path.join(output_dir_base,"PSM3", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
         else:
-            output_dir = os.path.join(output_dir_base,"PSM3", "WithoutVS")
+            output_dir = os.path.join(output_dir_base,"PSM3", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
         os.makedirs(os.path.join(output_dir), exist_ok=True) 
 
         with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:

@@ -18,8 +18,10 @@ if __name__ == "__main__":
     # parser.add_argument('--id', type=str, help='dir id')
     # args = parser.parse_args()
     # dir_id = args.id
-    dir_id = "000030"
-    LabelDic = {1:"rb", 2:"pb", 3:"eb", 4:"gl", 5:"gr", 6:"pr", 7:"rr", 8:"rb", 9:"pb", 10:"eb", 11:"gl", 12:"gr", 13:"pr", 14:"rr"} # to be adjusted on demand
+    dir_id = "000023"
+    DrawOn = True
+    DrawOn = False
+    LabelDic = {1:"rb", 2:"pb", 3:"eb", 4:"gl", 5:"gr", 6:"pr", 7:"rr", 8:"rb", 9:"pb", 10:"eb", 11:"gl", 12:"gr", 13:"rl", 14:"pl"} # to be adjusted on demand
 
     l_gripper_PSM1 = 9.0 * 1e-3 # m
     l_gripper_PSM3 = 9.0 * 1e-3 # m
@@ -154,7 +156,7 @@ if __name__ == "__main__":
         img_right = cv2.imread(img_name)
         KP_UV_LABELLED_NOW = KP_labelled_left[index]
 
-        # ###############  start from PSM1 only ###########
+        ###############  start from PSM1 only ###########
         PSM1_js = PSM1.js_his[index]
         alpha = GripperAnglePSM1[index]
         
@@ -182,12 +184,14 @@ if __name__ == "__main__":
         overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1, color=(255,0,0))
 
         overlay_visible = img_left.copy()
-        # # Draw keypoints and labels
-        # for key, value in KP_UV_LABELLED_NOW.items():
-        #     if key <=7 and value is not None:
-        #         overlay_visible = LEFT_CAM_PSM1.DrawKeyPoint(overlay_visible, value, text=str(key))
-        #         cv2.imshow("visible", overlay_visible)
-        #         cv2.waitKey(0)
+        
+        if DrawOn:
+            # Draw keypoints and labels
+            for key, value in KP_UV_LABELLED_NOW.items():
+                if key <=7 and value is not None:
+                    overlay_visible = LEFT_CAM_PSM1.DrawKeyPoint(overlay_visible, value, text=str(key))
+                    cv2.imshow("visible", overlay_visible)
+                    cv2.waitKey(0)
 
 
         KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7}
@@ -197,6 +201,7 @@ if __name__ == "__main__":
         UV_KP_PIXELS_PSM1 = [tuple(item) for item in UV_KP_PIXELS_PSM1]
         overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, text_list=UV_KP_NAMES_PSM1, color=color_blue)
         overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPixel_PSM1, text_list=KeyPointsName, color=(0,0,255))
+        
         
         # PnP initial calib
         for name in KP_UV_LABELLED_PSM1.keys():
@@ -220,7 +225,7 @@ if __name__ == "__main__":
             print("End of story, bye bye bye!!!")
             break
 
-        ##################### For PSM3 now ###########################################################################################
+        # ##################### For PSM3 now ###########################################################################################
         # PSM3_js = PSM3.js_his[index]
         # alpha = GripperAnglePSM3[index]
         
@@ -248,12 +253,14 @@ if __name__ == "__main__":
         # overlay = LEFT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, color=(255,0,0))
 
         # overlay_visible = img_left.copy()
-        # # # Draw keypoints and labels
-        # # for key, value in KP_UV_LABELLED_NOW.items():
-        # #     if key >7 and value is not None:
-        # #         overlay_visible = RIGHT_CAM_PSM3.DrawKeyPoint(overlay_visible, value, text=str(key))
-        # #         cv2.imshow("visible", overlay_visible)
-        # #         cv2.waitKey(0)
+
+        # if DrawOn:
+        #     # Draw keypoints and labels
+        #     for key, value in KP_UV_LABELLED_NOW.items():
+        #         if key >7 and value is not None:
+        #             overlay_visible = RIGHT_CAM_PSM3.DrawKeyPoint(overlay_visible, value, text=str(key))
+        #             cv2.imshow("visible", overlay_visible)
+        #             cv2.waitKey(0)
 
 
         # KP_UV_LABELLED_PSM3 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key > 7}
