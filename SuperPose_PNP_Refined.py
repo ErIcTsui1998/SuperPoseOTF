@@ -18,7 +18,7 @@ if __name__ == "__main__":
     # parser.add_argument('--id', type=str, help='dir id')
     # args = parser.parse_args()
     # dir_id = args.id
-    dir_id = "000024"
+    dir_id = "000030"
 
     ArmNameList = ['PSM1','PSM3']
     PSM1 = dvrk_arm()

@@ -18,10 +18,10 @@ if __name__ == "__main__":
     # parser.add_argument('--id', type=str, help='dir id')
     # args = parser.parse_args()
     # dir_id = args.id
-    dir_id = "000023"
+    dir_id = "000032"
     DrawOn = True
     DrawOn = False
-    LabelDic = {1:"rb", 2:"pb", 3:"eb", 4:"gl", 5:"gr", 6:"pr", 7:"rr", 8:"rb", 9:"pb", 10:"eb", 11:"gl", 12:"gr", 13:"rl", 14:"pl"} # to be adjusted on demand
+    LabelDic = {1:"rb", 2:"pb", 3:"eb", 4:"gl", 5:"gr", 6:"pl", 7:"rl", 8:"rb", 9:"pb", 10:"eb", 11:"gl", 12:"gr", 13:"pr", 14:"rr"} # to be adjusted on demand
 
     l_gripper_PSM1 = 9.0 * 1e-3 # m
     l_gripper_PSM3 = 9.0 * 1e-3 # m
@@ -157,141 +157,143 @@ if __name__ == "__main__":
         KP_UV_LABELLED_NOW = KP_labelled_left[index]
 
         ###############  start from PSM1 only ###########
-        PSM1_js = PSM1.js_his[index]
-        alpha = GripperAnglePSM1[index]
+        # PSM1_js = PSM1.js_his[index]
+        # alpha = GripperAnglePSM1[index]
         
-        KeyPointsRelDic["gr"] = np.array([l_gripper_PSM1 * np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), l_gripper_PSM1 *np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
-        KeyPointsRelDic["gl"] = np.array([-l_gripper_PSM1 *np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), l_gripper_PSM1 * np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
+        # KeyPointsRelDic["gr"] = np.array([l_gripper_PSM1 * np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), l_gripper_PSM1 *np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
+        # KeyPointsRelDic["gl"] = np.array([-l_gripper_PSM1 *np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), l_gripper_PSM1 * np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
 
-        KeyPointsPosPSM1 = [GetPositionInBaseFrame(PSM1_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsName]
-        KeyPointsPosPSM1Dic = dict(zip(KeyPointsName, KeyPointsPosPSM1))
-        JointPosPSM1 = [GetPositionInBaseFrame(PSM1_js, np.array([0,0,0]), i) for i in range(1,7)]
-        KeyPointsPosCameraLeft_PSM1 = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPosPSM1)
-        JointPosCameraLeft_PSM1 = LEFT_CAM_PSM1.GetPositionInCameraFrameList(JointPosPSM1)
-        KeyPointsPixel_PSM1 = LEFT_CAM_PSM1.PixelProjectionList(KeyPointsPosCameraLeft_PSM1)
-        gr_pixel, gl_pixel = KeyPointsPixel_PSM1[-2:]
-
-        gm_rel = np.array([0.0, 0.0102, 0.0]) # gripper middle
-        gm_PosPSM = GetPositionInBaseFrame(PSM1_js, gm_rel, 6)
-        gm_CameraLeft = LEFT_CAM_PSM1.GetPositionInCameraFrame(gm_PosPSM)
-        gm_pixel = LEFT_CAM_PSM1.PixelProjection(gm_CameraLeft)
-
-        j1_pixel, j2_pixel, j3_pixel, j4_pixel, j5_pixel, j6_pixel = LEFT_CAM_PSM1.PixelProjectionList(JointPosCameraLeft_PSM1)
-        Edges_PSM1 = LEFT_CAM_PSM1.GetEdgeProjectionCylinder(4e-3, PSM1_js)
-
-        overlay = img_left.copy()
-        overlay = LEFT_CAM_PSM1.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gm_pixel)], color=(255,0,0))
-        overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1, color=(255,0,0))
-
-        overlay_visible = img_left.copy()
-        
-        if DrawOn:
-            # Draw keypoints and labels
-            for key, value in KP_UV_LABELLED_NOW.items():
-                if key <=7 and value is not None:
-                    overlay_visible = LEFT_CAM_PSM1.DrawKeyPoint(overlay_visible, value, text=str(key))
-                    cv2.imshow("visible", overlay_visible)
-                    cv2.waitKey(0)
-
-
-        KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7}
-        UV_KP_NAMES_PSM1 = list(KP_UV_LABELLED_PSM1.keys())
-        UV_KP_NAMES_PSM1 = [str(item) for item in UV_KP_NAMES_PSM1]
-        UV_KP_PIXELS_PSM1 = list(KP_UV_LABELLED_PSM1.values())
-        UV_KP_PIXELS_PSM1 = [tuple(item) for item in UV_KP_PIXELS_PSM1]
-        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, text_list=UV_KP_NAMES_PSM1, color=color_blue)
-        overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPixel_PSM1, text_list=KeyPointsName, color=(0,0,255))
-        
-        
-        # PnP initial calib
-        for name in KP_UV_LABELLED_PSM1.keys():
-            PNP_PIXEL_LIST.append(KP_UV_LABELLED_PSM1[name])
-            PNP_OBJ_PTS_LIST.append(KeyPointsPosPSM1Dic[name])
-
-        if len(PNP_PIXEL_LIST) >= 4:
-            Tcr1_PNP = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
-            if Tcr1_PNP is None:
-                print("EPnP failednow")
-            else:
-                LEFT_CAM_PSM1.UpdateTcr(Tcr1_PNP)
-                print("PnP update now")
-
-        if index == 10:
-            os.chdir(SubDataSet)
-            os.makedirs("HandEye", exist_ok=True)
-            os.chdir("HandEye")
-            file_name = "Tcr_psm1_"+str(index)+".txt"
-            np.savetxt(file_name, Tcr1_PNP)
-            print("End of story, bye bye bye!!!")
-            break
-
-        # ##################### For PSM3 now ###########################################################################################
-        # PSM3_js = PSM3.js_his[index]
-        # alpha = GripperAnglePSM3[index]
-        
-        # KeyPointsRelDic["gr"] = np.array([l_gripper_PSM3 * np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), l_gripper_PSM3 *np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
-        # KeyPointsRelDic["gl"] = np.array([-l_gripper_PSM3 *np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), l_gripper_PSM3 * np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
-
-        # KeyPointsPosPSM3 = [GetPositionInBaseFrame(PSM3_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsName]
-        # KeyPointsPosPSM3Dic = dict(zip(KeyPointsName, KeyPointsPosPSM3))
-        # JointPosPSM3 = [GetPositionInBaseFrame(PSM3_js, np.array([0,0,0]), i) for i in range(1,7)]
-        # KeyPointsPosCameraLeft_PSM3 = LEFT_CAM_PSM3.GetPositionInCameraFrameList(KeyPointsPosPSM3)
-        # JointPosCameraLeft_PSM3 = LEFT_CAM_PSM3.GetPositionInCameraFrameList(JointPosPSM3)
-        # KeyPointsPixel_PSM3 = LEFT_CAM_PSM3.PixelProjectionList(KeyPointsPosCameraLeft_PSM3)
-        # gr_pixel, gl_pixel = KeyPointsPixel_PSM3[-2:]
+        # KeyPointsPosPSM1 = [GetPositionInBaseFrame(PSM1_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsName]
+        # KeyPointsPosPSM1Dic = dict(zip(KeyPointsName, KeyPointsPosPSM1))
+        # JointPosPSM1 = [GetPositionInBaseFrame(PSM1_js, np.array([0,0,0]), i) for i in range(1,7)]
+        # KeyPointsPosCameraLeft_PSM1 = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPosPSM1)
+        # JointPosCameraLeft_PSM1 = LEFT_CAM_PSM1.GetPositionInCameraFrameList(JointPosPSM1)
+        # KeyPointsPixel_PSM1 = LEFT_CAM_PSM1.PixelProjectionList(KeyPointsPosCameraLeft_PSM1)
+        # gr_pixel, gl_pixel = KeyPointsPixel_PSM1[-2:]
 
         # gm_rel = np.array([0.0, 0.0102, 0.0]) # gripper middle
-        # gm_PosPSM = GetPositionInBaseFrame(PSM3_js, gm_rel, 6)
-        # gm_CameraLeft = LEFT_CAM_PSM3.GetPositionInCameraFrame(gm_PosPSM)
-        # gm_pixel = LEFT_CAM_PSM3.PixelProjection(gm_CameraLeft)
+        # gm_PosPSM = GetPositionInBaseFrame(PSM1_js, gm_rel, 6)
+        # gm_CameraLeft = LEFT_CAM_PSM1.GetPositionInCameraFrame(gm_PosPSM)
+        # gm_pixel = LEFT_CAM_PSM1.PixelProjection(gm_CameraLeft)
 
-        # j1_pixel, j2_pixel, j3_pixel, j4_pixel, j5_pixel, j6_pixel = LEFT_CAM_PSM3.PixelProjectionList(JointPosCameraLeft_PSM3)
-        # Edges_PSM3 = LEFT_CAM_PSM3.GetEdgeProjectionCylinder(4e-3, PSM3_js)
+        # j1_pixel, j2_pixel, j3_pixel, j4_pixel, j5_pixel, j6_pixel = LEFT_CAM_PSM1.PixelProjectionList(JointPosCameraLeft_PSM1)
+        # Edges_PSM1 = LEFT_CAM_PSM1.GetEdgeProjectionCylinder(4e-3, PSM1_js)
 
         # overlay = img_left.copy()
-        # overlay = LEFT_CAM_PSM3.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gm_pixel)], color=(255,0,0))
-        # overlay = LEFT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, color=(255,0,0))
+        # overlay = LEFT_CAM_PSM1.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gm_pixel)], color=(255,0,0))
+        # overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1, color=(255,0,0))
 
         # overlay_visible = img_left.copy()
-
+        
         # if DrawOn:
         #     # Draw keypoints and labels
         #     for key, value in KP_UV_LABELLED_NOW.items():
-        #         if key >7 and value is not None:
-        #             overlay_visible = RIGHT_CAM_PSM3.DrawKeyPoint(overlay_visible, value, text=str(key))
+        #         if key <=7 and value is not None:
+        #             overlay_visible = LEFT_CAM_PSM1.DrawKeyPoint(overlay_visible, value, text=str(key))
         #             cv2.imshow("visible", overlay_visible)
         #             cv2.waitKey(0)
 
 
-        # KP_UV_LABELLED_PSM3 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key > 7}
-        # UV_KP_NAMES_PSM3 = list(KP_UV_LABELLED_PSM3.keys())
-        # UV_KP_NAMES_PSM3 = [str(item) for item in UV_KP_NAMES_PSM3]
-        # UV_KP_PIXELS_PSM3 = list(KP_UV_LABELLED_PSM3.values())
-        # UV_KP_PIXELS_PSM3 = [tuple(item) for item in UV_KP_PIXELS_PSM3]
-        # overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM3, text_list=UV_KP_NAMES_PSM3, color=color_blue)
-        # overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, KeyPointsPixel_PSM3, text_list=KeyPointsName, color=(0,0,255))
+        # KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7}
+        # UV_KP_NAMES_PSM1 = list(KP_UV_LABELLED_PSM1.keys())
+        # UV_KP_NAMES_PSM1 = [str(item) for item in UV_KP_NAMES_PSM1]
+        # UV_KP_PIXELS_PSM1 = list(KP_UV_LABELLED_PSM1.values())
+        # UV_KP_PIXELS_PSM1 = [tuple(item) for item in UV_KP_PIXELS_PSM1]
+        # overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM1, text_list=UV_KP_NAMES_PSM1, color=color_blue)
+        # overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, KeyPointsPixel_PSM1, text_list=KeyPointsName, color=(0,0,255))
+        
         
         # # PnP initial calib
-        # for name in KP_UV_LABELLED_PSM3.keys():
-        #     PNP_PIXEL_LIST.append(KP_UV_LABELLED_PSM3[name])
-        #     PNP_OBJ_PTS_LIST.append(KeyPointsPosPSM3Dic[name])
+        # for name in KP_UV_LABELLED_PSM1.keys():
+        #     PNP_PIXEL_LIST.append(KP_UV_LABELLED_PSM1[name])
+        #     PNP_OBJ_PTS_LIST.append(KeyPointsPosPSM1Dic[name])
 
         # if len(PNP_PIXEL_LIST) >= 4:
-        #     Tcr3_PNP = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
-        #     if Tcr3_PNP is None:
+        #     Tcr1_PNP = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
+        #     if Tcr1_PNP is None:
         #         print("EPnP failednow")
         #     else:
-        #         LEFT_CAM_PSM3.UpdateTcr(Tcr3_PNP)
+        #         LEFT_CAM_PSM1.UpdateTcr(Tcr1_PNP)
         #         print("PnP update now")
 
-        # if index == 100:
+        # if np.mod(index, 50) == 0 and index > 10:
         #     os.chdir(SubDataSet)
         #     os.makedirs("HandEye", exist_ok=True)
         #     os.chdir("HandEye")
-        #     file_name = "Tcr_psm3_"+str(index)+".txt"
-        #     np.savetxt(file_name, Tcr3_PNP)
+        #     file_name = "Tcr_psm1_"+str(index)+".txt"
+        #     np.savetxt(file_name, Tcr1_PNP)
         #     print("End of story, bye bye bye!!!")
-        #     break
+        #     if index == 200:
+        #         break
+
+        ##################### For PSM3 now ###########################################################################################
+        PSM3_js = PSM3.js_his[index]
+        alpha = GripperAnglePSM3[index]
+        
+        KeyPointsRelDic["gr"] = np.array([l_gripper_PSM3 * np.sin(alpha/2) + (5e-4)*np.cos(alpha/2), l_gripper_PSM3 *np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
+        KeyPointsRelDic["gl"] = np.array([-l_gripper_PSM3 *np.sin(alpha/2) - (5e-4)*np.cos(alpha/2), l_gripper_PSM3 * np.cos(alpha/2) - (5e-4)*np.sin(alpha/2), 0.0 ])
+
+        KeyPointsPosPSM3 = [GetPositionInBaseFrame(PSM3_js, KeyPointsRelDic[name], KeyPointsJointDic[name]) for name in KeyPointsName]
+        KeyPointsPosPSM3Dic = dict(zip(KeyPointsName, KeyPointsPosPSM3))
+        JointPosPSM3 = [GetPositionInBaseFrame(PSM3_js, np.array([0,0,0]), i) for i in range(1,7)]
+        KeyPointsPosCameraLeft_PSM3 = LEFT_CAM_PSM3.GetPositionInCameraFrameList(KeyPointsPosPSM3)
+        JointPosCameraLeft_PSM3 = LEFT_CAM_PSM3.GetPositionInCameraFrameList(JointPosPSM3)
+        KeyPointsPixel_PSM3 = LEFT_CAM_PSM3.PixelProjectionList(KeyPointsPosCameraLeft_PSM3)
+        gr_pixel, gl_pixel = KeyPointsPixel_PSM3[-2:]
+
+        gm_rel = np.array([0.0, 0.0102, 0.0]) # gripper middle
+        gm_PosPSM = GetPositionInBaseFrame(PSM3_js, gm_rel, 6)
+        gm_CameraLeft = LEFT_CAM_PSM3.GetPositionInCameraFrame(gm_PosPSM)
+        gm_pixel = LEFT_CAM_PSM3.PixelProjection(gm_CameraLeft)
+
+        j1_pixel, j2_pixel, j3_pixel, j4_pixel, j5_pixel, j6_pixel = LEFT_CAM_PSM3.PixelProjectionList(JointPosCameraLeft_PSM3)
+        Edges_PSM3 = LEFT_CAM_PSM3.GetEdgeProjectionCylinder(4e-3, PSM3_js)
+
+        overlay = img_left.copy()
+        overlay = LEFT_CAM_PSM3.DrawToolSkeleton(img_left, [(j1_pixel,j4_pixel), (j5_pixel, j6_pixel), (j6_pixel, gm_pixel)], color=(255,0,0))
+        overlay = LEFT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, color=(255,0,0))
+
+        overlay_visible = img_left.copy()
+
+        if DrawOn:
+            # Draw keypoints and labels
+            for key, value in KP_UV_LABELLED_NOW.items():
+                if key >7 and value is not None:
+                    overlay_visible = RIGHT_CAM_PSM3.DrawKeyPoint(overlay_visible, value, text=str(key))
+                    cv2.imshow("visible", overlay_visible)
+                    cv2.waitKey(0)
+
+
+        KP_UV_LABELLED_PSM3 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key > 7}
+        UV_KP_NAMES_PSM3 = list(KP_UV_LABELLED_PSM3.keys())
+        UV_KP_NAMES_PSM3 = [str(item) for item in UV_KP_NAMES_PSM3]
+        UV_KP_PIXELS_PSM3 = list(KP_UV_LABELLED_PSM3.values())
+        UV_KP_PIXELS_PSM3 = [tuple(item) for item in UV_KP_PIXELS_PSM3]
+        overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, UV_KP_PIXELS_PSM3, text_list=UV_KP_NAMES_PSM3, color=color_blue)
+        overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, KeyPointsPixel_PSM3, text_list=KeyPointsName, color=(0,0,255))
+        
+        # PnP initial calib
+        for name in KP_UV_LABELLED_PSM3.keys():
+            PNP_PIXEL_LIST.append(KP_UV_LABELLED_PSM3[name])
+            PNP_OBJ_PTS_LIST.append(KeyPointsPosPSM3Dic[name])
+
+        if len(PNP_PIXEL_LIST) >= 4:
+            Tcr3_PNP = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
+            if Tcr3_PNP is None:
+                print("EPnP failednow")
+            else:
+                LEFT_CAM_PSM3.UpdateTcr(Tcr3_PNP)
+                print("PnP update now")
+
+        if np.mod(index,50) == 0 and index > 10:
+            os.chdir(SubDataSet)
+            os.makedirs("HandEye", exist_ok=True)
+            os.chdir("HandEye")
+            file_name = "Tcr_psm3_"+str(index)+".txt"
+            np.savetxt(file_name, Tcr3_PNP)
+            print("End of story, bye bye bye!!!")
+            if index == 200:
+                break
 
 
         cv2.imshow("overlay", overlay)
