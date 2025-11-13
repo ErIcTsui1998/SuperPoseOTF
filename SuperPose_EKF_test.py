@@ -17,22 +17,22 @@ from time import time
 import argparse
 
 if __name__ == "__main__":    
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--id', type=str, help='dir id')
-    # parser.add_argument('--filter', type=str, help='filter type')
-    # parser.add_argument('--InitFrame', type=int, help='filter type')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--id', type=str, help='dir id')
+    parser.add_argument('--filter', type=str, help='filter type')
+    parser.add_argument('--InitFrame', type=int, help='filter type')
 
-    # args = parser.parse_args()
-    # dir_id = args.id
-    # FilterMode = args.filter
-    # InitCalibFrame = args.InitFrame
+    args = parser.parse_args()
+    dir_id = args.id
+    FilterMode = args.filter
+    InitCalibFrame = args.InitFrame
     
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
     
-    dir_id = "000005"
-    # Determine Filtermode "EKF", "PF", "AEKF"
-    FilterMode = "AEKF"   
-    InitCalibFrame = 10 
+    # dir_id = "000032"
+    # # Determine Filtermode "EKF", "PF", "AEKF"
+    # FilterMode = "AEKF"    
+    # InitCalibFrame = 100 
 
     VScheck = True
     ArmSelection = ['PSM1', 'PSM3']

@@ -18,10 +18,10 @@ if __name__ == "__main__":
     # parser.add_argument('--id', type=str, help='dir id')
     # args = parser.parse_args()
     # dir_id = args.id
-    dir_id = "000032"
-    DrawOn = True
+    dir_id = "000006"
+    # DrawOn = True
     DrawOn = False
-    LabelDic = {1:"rb", 2:"pb", 3:"eb", 4:"gl", 5:"gr", 6:"pl", 7:"rl", 8:"rb", 9:"pb", 10:"eb", 11:"gl", 12:"gr", 13:"pr", 14:"rr"} # to be adjusted on demand
+    LabelDic = {1:"rf", 2:"pf", 3:"ef", 4:"gr", 5:"gl", 6:"pr", 7:"rr", 8:"rb", 9:"pb", 10:"eb", 11:"gl", 12:"gr", 13:"pl", 14:"rl"} # to be adjusted on demand
 
     l_gripper_PSM1 = 9.0 * 1e-3 # m
     l_gripper_PSM3 = 9.0 * 1e-3 # m
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         img_right = cv2.imread(img_name)
         KP_UV_LABELLED_NOW = KP_labelled_left[index]
 
-        ###############  start from PSM1 only ###########
+        # ###############  start from PSM1 only ###########
         # PSM1_js = PSM1.js_his[index]
         # alpha = GripperAnglePSM1[index]
         
@@ -190,8 +190,12 @@ if __name__ == "__main__":
         #     for key, value in KP_UV_LABELLED_NOW.items():
         #         if key <=7 and value is not None:
         #             overlay_visible = LEFT_CAM_PSM1.DrawKeyPoint(overlay_visible, value, text=str(key))
+        #             # overlay_visible = LEFT_CAM_PSM1.DrawKeyPoint(overlay_visible, value, text=str(key)+" "+LabelDic[int(key)])
         #             cv2.imshow("visible", overlay_visible)
         #             cv2.waitKey(0)
+        # # cv2.imshow("overlay", overlay_visible)
+        # # if cv2.waitKey(10) & 0xFF == ord('q'):
+        # #     cv2.destroyAllWindows()
 
 
         # KP_UV_LABELLED_PSM1 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key <= 7}
@@ -216,7 +220,7 @@ if __name__ == "__main__":
         #         LEFT_CAM_PSM1.UpdateTcr(Tcr1_PNP)
         #         print("PnP update now")
 
-        # if np.mod(index, 50) == 0 and index > 10:
+        # if (np.mod(index, 50) == 0 and index > 10) or index==10:
         #     os.chdir(SubDataSet)
         #     os.makedirs("HandEye", exist_ok=True)
         #     os.chdir("HandEye")
@@ -260,8 +264,13 @@ if __name__ == "__main__":
             for key, value in KP_UV_LABELLED_NOW.items():
                 if key >7 and value is not None:
                     overlay_visible = RIGHT_CAM_PSM3.DrawKeyPoint(overlay_visible, value, text=str(key))
+                    # overlay_visible = RIGHT_CAM_PSM3.DrawKeyPoint(overlay_visible, value, text=str(key)+" "+LabelDic[int(key)])
                     cv2.imshow("visible", overlay_visible)
                     cv2.waitKey(0)
+
+        # cv2.imshow("overlay", overlay_visible)
+        # if cv2.waitKey(10) & 0xFF == ord('q'):
+        #     cv2.destroyAllWindows()
 
 
         KP_UV_LABELLED_PSM3 = {LabelDic[key]: value for key, value in KP_UV_LABELLED_NOW.items() if value != None and key > 7}
@@ -285,7 +294,7 @@ if __name__ == "__main__":
                 LEFT_CAM_PSM3.UpdateTcr(Tcr3_PNP)
                 print("PnP update now")
 
-        if np.mod(index,50) == 0 and index > 10:
+        if (np.mod(index, 50) == 0 and index > 10) or index==10:
             os.chdir(SubDataSet)
             os.makedirs("HandEye", exist_ok=True)
             os.chdir("HandEye")
