@@ -17,3 +17,6 @@ Modifications: <br>
 
 Notes: <br>
 1. The EKF MC method is barely useful in that when sigma is chosen as a small value, singularity error is flagged. However, when large sigma values are selected, the correction is not effective, because error kernel values are close to 1 (saturation).  
+
+What's new: <br>
+Evaluate the performance of different filters in the face of sudden disturbances
