@@ -17,22 +17,22 @@ from time import time
 import argparse
 
 if __name__ == "__main__":    
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--id', type=str, help='dir id')
-    parser.add_argument('--filter', type=str, help='filter type')
-    parser.add_argument('--InitFrame', type=int, help='filter type')
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--id', type=str, help='dir id')
+    # parser.add_argument('--filter', type=str, help='filter type')
+    # parser.add_argument('--InitFrame', type=int, help='filter type')
 
-    args = parser.parse_args()
-    dir_id = args.id
-    FilterMode = args.filter
-    InitCalibFrame = args.InitFrame
+    # args = parser.parse_args()
+    # dir_id = args.id
+    # FilterMode = args.filter
+    # InitCalibFrame = args.InitFrame
     
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
     
-    # dir_id = "000032"
-    # # Determine Filtermode "EKF", "PF", "AEKF"
-    # FilterMode = "AEKF"    
-    # InitCalibFrame = 100 
+    dir_id = "000006"
+    # Determine Filtermode "EKF", "PF", "AEKF", "PNP"
+    FilterMode = "PF"    
+    InitCalibFrame = 100 
 
     VScheck = True
     ArmSelection = ['PSM1', 'PSM3']
@@ -379,20 +379,23 @@ if __name__ == "__main__":
             TIME_JCBB_HIS[index] = time_JCBB_end - time_JCBB_start
             TIME_FILTER_HIS[index] = time_FILTER_end - time_FILTER_start
 
-            # For cumulative PnP RANSAC calculation
-            if len(MatchedMeasurementPSM1Dict) > 0:
-                PNP_PIXEL_LIST = PNP_PIXEL_LIST + [list(value) for value in MatchedMeasurementPSM1Dict.values()]
-                PNP_OBJ_PTS_LIST = PNP_OBJ_PTS_LIST + [KeyPointsPSM1PosDic[key] for key in MatchedMeasurementPSM1Dict.keys()]
+            if FilterMode == "PNP":
+                # For cumulative PnP RANSAC calculation
+                if len(MatchedMeasurementPSM1Dict) > 0:
+                    PNP_PIXEL_LIST = PNP_PIXEL_LIST + [list(value) for value in MatchedMeasurementPSM1Dict.values()]
+                    PNP_OBJ_PTS_LIST = PNP_OBJ_PTS_LIST + [KeyPointsPSM1PosDic[key] for key in MatchedMeasurementPSM1Dict.keys()]
 
-            if len(PNP_PIXEL_LIST) >= 4:
-                Tcr1_pnp = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
-                if Tcr1_pnp is None:
-                    print("EPnP failednow")
-                    T_PNP_HIS[index] = np.zeros(16)
+                if len(PNP_PIXEL_LIST) >= 4:
+                    Tcr1_pnp = PnPEstimation(PNP_OBJ_PTS_LIST, PNP_PIXEL_LIST, K_left, D_left)
+                    if Tcr1_pnp is None:
+                        print("EPnP failednow")
+                        T_PNP_HIS[index] = np.zeros(16)
+                    else:
+                        T_PNP_HIS[index] = Tcr1_pnp.flatten()
+                        LEFT_CAM_PSM1.UpdateTcr(Tcr1_pnp)
+                        T_cr1 = Tcr1_pnp
                 else:
-                    T_PNP_HIS[index] = Tcr1_pnp.flatten()
-            else:
-                T_PNP_HIS[index] = np.zeros(16)
+                    T_PNP_HIS[index] = np.zeros(16)
 
         # ##################### For PSM3 now ###########################################################################################
         if "PSM3" in ArmSelection:
@@ -540,23 +543,27 @@ if __name__ == "__main__":
             PSM3_T_CR_HIS[index] = T_cr3_new.flatten()
             PSM3_TIME_JCBB_HIS[index] = time_JCBB_end - time_JCBB_start
             PSM3_TIME_FILTER_HIS[index] = time_FILTER_end - time_FILTER_start
+            
+            if FilterMode == "PNP":
+                # For cumulative PnP RANSAC calculation
+                if len(MatchedMeasurementPSM3Dict) > 0:
+                    PSM3_PNP_PIXEL_LIST = PSM3_PNP_PIXEL_LIST + [list(value) for value in MatchedMeasurementPSM3Dict.values()]
+                    PSM3_PNP_OBJ_PTS_LIST = PSM3_PNP_OBJ_PTS_LIST + [KeyPointsPSM3PosDic[key] for key in MatchedMeasurementPSM3Dict.keys()]
 
-            # For cumulative PnP RANSAC calculation
-            if len(MatchedMeasurementPSM3Dict) > 0:
-                PSM3_PNP_PIXEL_LIST = PSM3_PNP_PIXEL_LIST + [list(value) for value in MatchedMeasurementPSM3Dict.values()]
-                PSM3_PNP_OBJ_PTS_LIST = PSM3_PNP_OBJ_PTS_LIST + [KeyPointsPSM3PosDic[key] for key in MatchedMeasurementPSM3Dict.keys()]
-
-            if len(PSM3_PNP_PIXEL_LIST) >= 4:
-                Tcr3_pnp = PnPEstimation(PSM3_PNP_OBJ_PTS_LIST, PSM3_PNP_PIXEL_LIST, K_left, D_left)
-                if Tcr3_pnp is None:
-                    print("EPnP failednow")
-                    PSM3_T_PNP_HIS[index] = np.zeros(16)
+                if len(PSM3_PNP_PIXEL_LIST) >= 4:
+                    Tcr3_pnp = PnPEstimation(PSM3_PNP_OBJ_PTS_LIST, PSM3_PNP_PIXEL_LIST, K_left, D_left)
+                    if Tcr3_pnp is None:
+                        print("EPnP failednow")
+                        PSM3_T_PNP_HIS[index] = np.zeros(16)
+                    else:
+                        PSM3_T_PNP_HIS[index] = Tcr3_pnp.flatten()
+                        LEFT_CAM_PSM3.UpdateTcr(Tcr3_pnp)
+                        T_cr3 = Tcr3_pnp
                 else:
-                    PSM3_T_PNP_HIS[index] = Tcr3_pnp.flatten()
-            else:
-                PSM3_T_PNP_HIS[index] = np.zeros(16)
+                    PSM3_T_PNP_HIS[index] = np.zeros(16)
         
         cv2.imshow("overlay", overlay)
+        # cv2.waitKey(0)
         if cv2.waitKey(10) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
 
