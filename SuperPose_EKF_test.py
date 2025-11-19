@@ -21,17 +21,27 @@ if __name__ == "__main__":
     parser.add_argument('--id', type=str, help='dir id')
     parser.add_argument('--filter', type=str, help='filter type')
     parser.add_argument('--InitFrame', type=int, help='filter type')
+    parser.add_argument('--Level', type=str, help='disturbance level')
+    parser.add_argument('--transerror', type=float, help='translation error')
+    parser.add_argument('--roterror', type=float, help='rotation error')
 
     args = parser.parse_args()
     dir_id = args.id
     FilterMode = args.filter
     InitCalibFrame = args.InitFrame
+    disturbance_level = args.Level
+    trans_error = args.transerror * 1e-2
+    rot_error = args.roterror * np.pi/180
     
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
-    
-    # dir_id = "000032"
+
+    # disturbance_level = "Low"
+    # trans_error = 5*1e-2 # 1 cm
+    # rot_error = 5*np.pi/180 # 1 degree
+
+    # dir_id = "000006"
     # # Determine Filtermode "EKF", "PF", "AEKF"
-    # FilterMode = "AEKF"    
+    # FilterMode = "PF"    
     # InitCalibFrame = 100 
 
     VScheck = True
@@ -209,6 +219,7 @@ if __name__ == "__main__":
     TIME_FILTER_HIS = {}
     PNP_PIXEL_LIST = []
     PNP_OBJ_PTS_LIST = []
+    T_CR_DISTURBANCE_HIS = {}
 
     PSM3_KP_3D_PREDICTION_HIS = {}
     PSM3_KP_3D_MEASUREMENT_HIS = {}
@@ -220,6 +231,7 @@ if __name__ == "__main__":
     PSM3_TIME_FILTER_HIS = {}
     PSM3_PNP_PIXEL_LIST = []
     PSM3_PNP_OBJ_PTS_LIST = []
+    PSM3_T_CR_DISTURBANCE_HIS = {}
 
     for index in range(n_images):
         img_name = "frame" + str(index) + ".png"
@@ -361,6 +373,19 @@ if __name__ == "__main__":
                 T_cr1 = T_cr1_new
 
             time_FILTER_end = time()
+
+            # Add disturbances
+            if np.mod(index, 25) == 0 and index >10:
+                trans_error_vec = np.random.uniform(low=-trans_error, high=trans_error, size=(3,))
+                rot_error_vec = np.random.uniform(low=-rot_error, high=rot_error, size=(3,))
+                rot_error_vec = rot_error_vec.astype(np.float32)
+                rot_error_mat = cv2.Rodrigues(rot_error_vec)[0]
+                new_matrix = np.identity(4)
+                new_matrix[:3,:3] = rot_error_mat
+                new_matrix[:3,-1] = trans_error_vec
+                T_cr1_new = T_cr1_new @ new_matrix
+                LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
+                T_CR_DISTURBANCE_HIS[index] = new_matrix.flatten()
 
             ######################### Error Analysis 3d ############################################
             KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM1.GetPositionInCameraFrameList(KeyPointsPSM1Pos)
@@ -521,6 +546,18 @@ if __name__ == "__main__":
                 T_cr3 = T_cr3_new
 
             time_FILTER_end = time()
+            # Add disturbances
+            if np.mod(index, 25) == 0 and index >10:
+                trans_error_vec = np.random.uniform(low=-trans_error, high=trans_error, size=(3,))
+                rot_error_vec = np.random.uniform(low=-rot_error, high=rot_error, size=(3,))
+                rot_error_vec = rot_error_vec.astype(np.float32)
+                rot_error_mat = cv2.Rodrigues(rot_error_vec)[0]
+                new_matrix = np.identity(4)
+                new_matrix[:3,:3] = rot_error_mat
+                new_matrix[:3,-1] = trans_error_vec
+                T_cr3_new = T_cr3_new @ new_matrix
+                LEFT_CAM_PSM3.UpdateTcr(T_cr3_new)
+                PSM3_T_CR_DISTURBANCE_HIS[index] = new_matrix.flatten()
             # ######################### Error Analysis 3d ############################################
 
             PSM3_KP_3D_CALIBRATED_LIST = LEFT_CAM_PSM3.GetPositionInCameraFrameList(KeyPointsPSM3Pos)
@@ -573,11 +610,12 @@ if __name__ == "__main__":
         KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(KP_2D_PIXEL_MEASUREMENT_HIS)
         T_PNP_HIS = MakeNumDicWritable(T_PNP_HIS)
         T_CR_HIS = MakeNumDicWritable(T_CR_HIS)
+        T_CR_DISTURBANCE_HIS = MakeNumDicWritable(T_CR_DISTURBANCE_HIS)
 
         if VScheck:
-            output_dir = os.path.join(output_dir_base,"PSM1", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
+            output_dir = os.path.join(output_dir_base,"PSM1","Disturbance",disturbance_level, "WithVS", "InitCalibFrame"+str(InitCalibFrame))
         else:
-            output_dir = os.path.join(output_dir_base,"PSM1", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
+            output_dir = os.path.join(output_dir_base,"PSM1","Disturbance",disturbance_level, "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
         
         os.makedirs(os.path.join(output_dir), exist_ok=True) 
 
@@ -606,11 +644,12 @@ if __name__ == "__main__":
         PSM3_KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(PSM3_KP_2D_PIXEL_MEASUREMENT_HIS)
         PSM3_T_PNP_HIS = MakeNumDicWritable(PSM3_T_PNP_HIS)
         PSM3_T_CR_HIS = MakeNumDicWritable(PSM3_T_CR_HIS)
+        PSM3_T_CR_DISTURBANCE_HIS = MakeNumDicWritable(PSM3_T_CR_DISTURBANCE_HIS)
         
         if VScheck:
-            output_dir = os.path.join(output_dir_base,"PSM3", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
+            output_dir = os.path.join(output_dir_base,"PSM3","Disturbance",disturbance_level, "WithVS", "InitCalibFrame"+str(InitCalibFrame))
         else:
-            output_dir = os.path.join(output_dir_base,"PSM3", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
+            output_dir = os.path.join(output_dir_base,"PSM3","Disturbance",disturbance_level, "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
         os.makedirs(os.path.join(output_dir), exist_ok=True) 
 
         with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
