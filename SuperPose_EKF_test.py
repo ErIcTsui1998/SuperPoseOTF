@@ -29,10 +29,16 @@ if __name__ == "__main__":
     
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
     
-    dir_id = "000006"
+    dir_id = "000030"
     # Determine Filtermode "EKF", "PF", "AEKF", "PNP"
     FilterMode = "PF"    
-    InitCalibFrame = 100 
+    InitCalibFrame = 200 
+
+    # For output video compilation
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+    video_folder = "/home/zc519/Videos/XraMaterial"
+    video_name = FilterMode + "_" + dir_id + ".mp4"
+    video = cv2.VideoWriter(os.path.join(video_folder, video_name), fourcc, 20, (1400, 986))
 
     VScheck = True
     ArmSelection = ['PSM1', 'PSM3']
@@ -562,10 +568,12 @@ if __name__ == "__main__":
                 else:
                     PSM3_T_PNP_HIS[index] = np.zeros(16)
         
+        video.write(overlay)
         cv2.imshow("overlay", overlay)
         # cv2.waitKey(0)
         if cv2.waitKey(10) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
+        print(f"Current status {index} / {n_images}")
 
     print("End of the project")
 
