@@ -120,3 +120,22 @@ def MakeNumDicWritable(dic_ref):
         else:
             MakeNumDicWritable(value)
     return dic_ref
+
+def FindRCMAnalyticalUtils(lines_3d):
+    n_lines = len(lines_3d)
+    if n_lines < 2:
+        raise("number of lines is smaller than 2, cannot run the RCM estimation module")
+    LHS_mat = np.zeros((3,3))
+    RHS_vec = np.zeros(3)
+    for i in range(n_lines):
+        pt1, pt2 = lines_3d[i]
+        pt1 = np.asarray(pt1)
+        pt2 = np.asarray(pt2)
+        n_vec = ((pt2-pt1) / np.linalg.norm(pt2-pt1)).reshape(-1,1)
+        n_mat = n_vec @ n_vec.T
+        mat_inc = n_mat - np.identity(3)
+        vec_inc = mat_inc @ pt1
+        LHS_mat = LHS_mat + mat_inc
+        RHS_vec = RHS_vec + vec_inc
+    rcm_estimated = np.linalg.solve(LHS_mat, RHS_vec)
+    return rcm_estimated

@@ -2,6 +2,9 @@ import numpy as np
 from Jacobian import RotX, RotY, RotZ, JacobianCalculator
 from Kinematics import GetPositionInBaseFrame
 
+inf_pixel = np.array([np.inf,np.inf])
+inf_H = np.ones((2,6)) * np.inf
+
 class EKF_SuperDataSet:
     def __init__(self, state_mean_init, state_cov_init, measure_cov_init, Tcr_init):
         self.__state_cov = state_cov_init # 6*6
@@ -16,7 +19,7 @@ class EKF_SuperDataSet:
         self.__state_mean = new_state_mean
         self.__measure_cov = new_measure_cov
 
-    def EKFReadMeasurement(self, PredictionDic, MeasurementDic, JacobianDic):
+    def EKFReadMeasurement(self, PredictionDic, MeasurementDic, JacobianDic, rcm_pixel_predict = inf_pixel, rcm_pixel_measure = inf_pixel, H_rcm = inf_H):
         # Within known correspondences between prediction and measurements
         state_mean_candidate = self.__state_mean.copy()
         state_cov_candidate = self.__state_cov.copy()
@@ -44,7 +47,18 @@ class EKF_SuperDataSet:
             KH = K @ H
             mat1 = np.identity(KH.shape[0]) - KH
             state_cov_candidate = mat1 @ state_cov_candidate
-        
+
+        if np.inf not in rcm_pixel_measure:
+           rcm_measure = np.array([rcm_pixel_measure[0], rcm_pixel_measure[1]])
+           rcm_predict = np.array([rcm_pixel_predict[0], rcm_pixel_predict[1]])
+           error_rcm = rcm_measure - rcm_predict
+           S_rcm = np.matmul(np.matmul(H_rcm, state_cov_candidate), H_rcm.T) + measurement_cov
+           K_rcm = state_cov_candidate @ H_rcm.T @ np.linalg.inv(S_rcm)
+           state_mean_candidate = state_mean_candidate + K_rcm @ error_rcm
+           KH_rcm = K_rcm @ H_rcm
+           mat1_rcm = np.identity(KH_rcm.shape[0]) - KH_rcm
+           state_cov_candidate = mat1_rcm @ state_cov_candidate
+
         self.__state_mean = state_mean_candidate.copy()
         self.__state_cov = state_cov_candidate.copy()
 

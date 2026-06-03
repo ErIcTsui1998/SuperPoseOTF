@@ -4,7 +4,7 @@ import os
 import random
 import yaml
 import cv2
-from utils import get_rigid_transform, GetPositionInBaseFrame, GetPositionInCameraFrame, QuaternionToRot, dvrk_DH_transformation, MakeNumDicWritable
+from utils import get_rigid_transform, GetPositionInBaseFrame, GetPositionInCameraFrame, QuaternionToRot, dvrk_DH_transformation, MakeNumDicWritable, FindRCMAnalyticalUtils
 from utils_vision import PnPEstimation, GetROIFromKinematics, GetListOfLineEquationFromPointSet, IsPointAbovelineList, GetPointToLineDistanceList, VisibilityEvaluation, IsPointVisibleList
 from dvrk_camera import dvrk_camera
 from Jacobian import JacobianCalculatorImage, RotX, RotY, RotZ
@@ -15,6 +15,18 @@ from AEKF_Knownpairs import AEKF_SuperDataSet
 from PF_Knownpairs import PF_SuperDataSet
 from time import time
 import argparse
+
+num_rcm_estimation = 3
+lines_3D_shaft_PSM1 = []
+lines_3D_shaft_PSM3 = []
+rcm_analytical_PSM1 = np.ones(3) * np.inf
+rcm_analytical_PSM3 = np.ones(3) * np.inf
+rcm_pixel_psm1 = np.ones(2) * np.inf
+rcm_pixel_psm3 = np.ones(2) * np.inf
+rcm_pixel_analytical_PSM1 = np.ones(2) * np.inf
+rcm_pixel_analytical_PSM3 = np.ones(2) * np.inf
+H_rcm_PSM1 = np.ones((2,6)) * np.inf
+H_rcm_PSM3 = np.ones((2,6)) * np.inf
 
 if __name__ == "__main__":    
     # parser = argparse.ArgumentParser()
@@ -29,10 +41,10 @@ if __name__ == "__main__":
     
     BaseFolder = "/home/zc519/Downloads/SurgPoseDataSet"
     
-    dir_id = "000030"
+    dir_id = "000001"
     # Determine Filtermode "EKF", "PF", "AEKF", "PNP"
-    FilterMode = "PF"    
-    InitCalibFrame = 200 
+    FilterMode = "EKF"    
+    InitCalibFrame = 10 
 
     # For output video compilation
     fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
@@ -271,6 +283,12 @@ if __name__ == "__main__":
             overlay = LEFT_CAM_PSM1.DrawLines(overlay, Edges_PSM1, thickness=4)
             overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, [j4_pixel, j6_pixel, gl_PSM1_pixel, gr_PSM1_pixel],color=(0,255,0), radius=8)
 
+            lines_3D_shaft_PSM1.append([JointPSM1PosCameraRight[0], JointPSM1PosCameraRight[3]])
+            if len(lines_3D_shaft_PSM1) >= num_rcm_estimation:
+                rcm_analytical_PSM1 = FindRCMAnalyticalUtils(lines_3D_shaft_PSM1)
+                rcm_pixel_analytical_PSM1 = LEFT_CAM_PSM1.PixelProjection(rcm_analytical_PSM1)
+                rcm_pixel_psm1 = j1_pixel
+
             ########################### Visibility Test & Scores ############################################
             roll_part_evaluation = IsPointAbovelineList(KeyPointsPSM1Pixel[:4], SkeletonLine_PSM1_list[0])
             roll_part_above_edge1_evaluation = IsPointAbovelineList(KeyPointsPSM1Pixel[:4], Edges_PSM1[1])
@@ -322,7 +340,8 @@ if __name__ == "__main__":
             # JCBB data association using Jacobian 
             JacobianValues_PSM1 = [JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr1, KeyPointsPSM1PosDic[name]) for name in KeyPointsNamePSM1]
             JacobiansInput_PSM1 = dict(zip(LandmarkPSM1Value, JacobianValues_PSM1))
-            
+            H_rcm_PSM1 = JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr1, np.zeros(3))
+
             time_JCBB_start = time()
             JCBB_obj1.ReadPredictedFeatureValues(KeyPointsPSM1Pixel, JacobiansInput_PSM1, JCBB_obj1_cov_state)
             if VScheck:
@@ -347,14 +366,14 @@ if __name__ == "__main__":
             time_FILTER_start = time()
 
             if FilterMode == "EKF":
-                EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict)
+                EKF_obj1.EKFReadMeasurement(KeyPointsPSM1PixelDic, MatchedMeasurementPSM1Dict, JacobiansPSM1Dict, rcm_pixel_psm1, rcm_pixel_analytical_PSM1, H_rcm_PSM1)
                 T_cr1_new = EKF_obj1.ReturnTcrEstimation()
                 LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
 
             if FilterMode == "AEKF":
-                AEKF_obj1.AEKFReadMeasurement(MatchedMeasurementPSM1Dict, KeyPointsPSM1PosDic, K_left)
+                AEKF_obj1.AEKFReadMeasurement(MatchedMeasurementPSM1Dict, KeyPointsPSM1PosDic, K_left, rcm_analytical_PSM1)
                 T_cr1_new = AEKF_obj1.ReturnTcrEstimation()
-                JCBB_obj1_cov_state = 5e2 * AEKF_obj1.ReturnStateEstimation()[1]
+                JCBB_obj1_cov_state = 5e3 * AEKF_obj1.ReturnStateEstimation()[1]
                 JCBB_obj1_cov_measure = AEKF_obj1.ReturnCovMeasureEstimation()
                 LEFT_CAM_PSM1.UpdateTcr(T_cr1_new)
                 T_cr1 = T_cr1_new
@@ -432,7 +451,13 @@ if __name__ == "__main__":
 
             overlay = LEFT_CAM_PSM3.DrawToolSkeleton(overlay, [(j3_PSM3_pixel,j4_PSM3_pixel), (j5_PSM3_pixel, j6_PSM3_pixel), (j6_PSM3_pixel, gl_PSM3_pixel), (j6_PSM3_pixel, gr_PSM3_pixel)], thickness=4)
             overlay = LEFT_CAM_PSM3.DrawLines(overlay, Edges_PSM3, thickness=4)
-            overlay = LEFT_CAM_PSM1.DrawKeyPointsList(overlay, [j4_PSM3_pixel, j6_PSM3_pixel, gl_PSM3_pixel, gr_PSM3_pixel],color=(0,255,0), radius=8)
+            overlay = LEFT_CAM_PSM3.DrawKeyPointsList(overlay, [j4_PSM3_pixel, j6_PSM3_pixel, gl_PSM3_pixel, gr_PSM3_pixel],color=(0,255,0), radius=8)
+
+            lines_3D_shaft_PSM3.append([JointPosPSM3CameraRight[0], JointPosPSM3CameraRight[3]]) # shaft line that consists of the rcm and joint 4
+            if len(lines_3D_shaft_PSM3) >= num_rcm_estimation:
+                rcm_analytical_PSM3 = FindRCMAnalyticalUtils(lines_3D_shaft_PSM3)
+                rcm_pixel_analytical_PSM3 = LEFT_CAM_PSM3.PixelProjection(rcm_analytical_PSM3)
+                rcm_pixel_psm3 = j1_PSM3_pixel
 
             ########################### Visibility Test & Scores ############################################
             roll_part_evaluation = IsPointAbovelineList(KeyPointsPSM3Pixel[:4], SkeletonLine_PSM3_list[0])
@@ -485,7 +510,8 @@ if __name__ == "__main__":
             # JCBB data association using Jacobian 
             JacobianValues_PSM3 = [JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr3, KeyPointsPSM3PosDic[name]) for name in KeyPointsNamePSM3]
             JacobiansInput_PSM3 = dict(zip(LandmarkPSM3Value, JacobianValues_PSM3))
-            
+            H_rcm_PSM3 = JacobianCalculatorImage(K_left, np.zeros(3), np.zeros(3), T_cr3, np.zeros(3))
+
             time_JCBB_start = time()
             JCBB_obj3.ReadPredictedFeatureValues(KeyPointsPSM3Pixel, JacobiansInput_PSM3, JCBB_obj3_cov_state)
             
@@ -510,14 +536,14 @@ if __name__ == "__main__":
             
             time_FILTER_start = time()
             if FilterMode == "EKF":
-                EKF_obj3.EKFReadMeasurement(KeyPointsPSM3PixelDic, MatchedMeasurementPSM3Dict, JacobiansPSM3Dict)
+                EKF_obj3.EKFReadMeasurement(KeyPointsPSM3PixelDic, MatchedMeasurementPSM3Dict, JacobiansPSM3Dict, rcm_pixel_psm3, rcm_pixel_analytical_PSM3, H_rcm_PSM3)
                 T_cr3_new = EKF_obj3.ReturnTcrEstimation()
                 LEFT_CAM_PSM3.UpdateTcr(T_cr3_new)
 
             if FilterMode == "AEKF":
-                AEKF_obj3.AEKFReadMeasurement(MatchedMeasurementPSM3Dict, KeyPointsPSM3PosDic, K_left)
+                AEKF_obj3.AEKFReadMeasurement(MatchedMeasurementPSM3Dict, KeyPointsPSM3PosDic, K_left, rcm_analytical_PSM3)
                 T_cr3_new = AEKF_obj3.ReturnTcrEstimation()
-                JCBB_obj3_cov_state = 5e2 * AEKF_obj3.ReturnStateEstimation()[1]
+                JCBB_obj3_cov_state = 5e3 * AEKF_obj3.ReturnStateEstimation()[1]
                 JCBB_obj3_cov_measure = AEKF_obj3.ReturnCovMeasureEstimation()
                 LEFT_CAM_PSM3.UpdateTcr(T_cr3_new)
                 T_cr3 = T_cr3_new
@@ -577,70 +603,70 @@ if __name__ == "__main__":
 
     print("End of the project")
 
-    output_dir_base = os.path.join("/home/zc519/Projects/SuperPose_OTF", "AnalysisResults", dir_id, FilterMode)
-    os.makedirs(output_dir_base, exist_ok=True) 
+    # output_dir_base = os.path.join("/home/zc519/Projects/SuperPose_OTF", "AnalysisResults", dir_id, FilterMode)
+    # os.makedirs(output_dir_base, exist_ok=True) 
 
-    if "PSM1" in ArmSelection:
-        # convert all dics into yaml writable form (PSM1)
-        KP_3D_PREDICTION_HIS = MakeNumDicWritable(KP_3D_PREDICTION_HIS)
-        KP_3D_MEASUREMENT_HIS = MakeNumDicWritable(KP_3D_MEASUREMENT_HIS)
-        KP_2D_PIXEL_PREDICTION_HIS = MakeNumDicWritable(KP_2D_PIXEL_PREDICTION_HIS)
-        KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(KP_2D_PIXEL_MEASUREMENT_HIS)
-        T_PNP_HIS = MakeNumDicWritable(T_PNP_HIS)
-        T_CR_HIS = MakeNumDicWritable(T_CR_HIS)
+    # if "PSM1" in ArmSelection:
+    #     # convert all dics into yaml writable form (PSM1)
+    #     KP_3D_PREDICTION_HIS = MakeNumDicWritable(KP_3D_PREDICTION_HIS)
+    #     KP_3D_MEASUREMENT_HIS = MakeNumDicWritable(KP_3D_MEASUREMENT_HIS)
+    #     KP_2D_PIXEL_PREDICTION_HIS = MakeNumDicWritable(KP_2D_PIXEL_PREDICTION_HIS)
+    #     KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(KP_2D_PIXEL_MEASUREMENT_HIS)
+    #     T_PNP_HIS = MakeNumDicWritable(T_PNP_HIS)
+    #     T_CR_HIS = MakeNumDicWritable(T_CR_HIS)
 
-        if VScheck:
-            output_dir = os.path.join(output_dir_base,"PSM1", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
-        else:
-            output_dir = os.path.join(output_dir_base,"PSM1", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
+    #     if VScheck:
+    #         output_dir = os.path.join(output_dir_base,"PSM1", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
+    #     else:
+    #         output_dir = os.path.join(output_dir_base,"PSM1", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
         
-        os.makedirs(os.path.join(output_dir), exist_ok=True) 
+    #     os.makedirs(os.path.join(output_dir), exist_ok=True) 
 
-        with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
-            yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
-            yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
-            yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
-            yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
-            yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
-            yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "TIME_JCBB_HIS.yaml"), "w") as f:
-            yaml.dump(TIME_JCBB_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "TIME_FILTER_HIS.yaml"), "w") as f:
-            yaml.dump(TIME_FILTER_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
+    #         yaml.dump(KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
+    #         yaml.dump(KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
+    #         yaml.dump(KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
+    #         yaml.dump(KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
+    #         yaml.dump(T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
+    #         yaml.dump(T_CR_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "TIME_JCBB_HIS.yaml"), "w") as f:
+    #         yaml.dump(TIME_JCBB_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "TIME_FILTER_HIS.yaml"), "w") as f:
+    #         yaml.dump(TIME_FILTER_HIS, f, default_flow_style=False, sort_keys=False)
 
-    if "PSM3" in ArmSelection:
-        # convert all dics into yaml writable form (PSM3)
-        PSM3_KP_3D_PREDICTION_HIS = MakeNumDicWritable(PSM3_KP_3D_PREDICTION_HIS)
-        PSM3_KP_3D_MEASUREMENT_HIS = MakeNumDicWritable(PSM3_KP_3D_MEASUREMENT_HIS)
-        PSM3_KP_2D_PIXEL_PREDICTION_HIS = MakeNumDicWritable(PSM3_KP_2D_PIXEL_PREDICTION_HIS)
-        PSM3_KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(PSM3_KP_2D_PIXEL_MEASUREMENT_HIS)
-        PSM3_T_PNP_HIS = MakeNumDicWritable(PSM3_T_PNP_HIS)
-        PSM3_T_CR_HIS = MakeNumDicWritable(PSM3_T_CR_HIS)
+    # if "PSM3" in ArmSelection:
+    #     # convert all dics into yaml writable form (PSM3)
+    #     PSM3_KP_3D_PREDICTION_HIS = MakeNumDicWritable(PSM3_KP_3D_PREDICTION_HIS)
+    #     PSM3_KP_3D_MEASUREMENT_HIS = MakeNumDicWritable(PSM3_KP_3D_MEASUREMENT_HIS)
+    #     PSM3_KP_2D_PIXEL_PREDICTION_HIS = MakeNumDicWritable(PSM3_KP_2D_PIXEL_PREDICTION_HIS)
+    #     PSM3_KP_2D_PIXEL_MEASUREMENT_HIS = MakeNumDicWritable(PSM3_KP_2D_PIXEL_MEASUREMENT_HIS)
+    #     PSM3_T_PNP_HIS = MakeNumDicWritable(PSM3_T_PNP_HIS)
+    #     PSM3_T_CR_HIS = MakeNumDicWritable(PSM3_T_CR_HIS)
         
-        if VScheck:
-            output_dir = os.path.join(output_dir_base,"PSM3", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
-        else:
-            output_dir = os.path.join(output_dir_base,"PSM3", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
-        os.makedirs(os.path.join(output_dir), exist_ok=True) 
+    #     if VScheck:
+    #         output_dir = os.path.join(output_dir_base,"PSM3", "WithVS", "InitCalibFrame"+str(InitCalibFrame))
+    #     else:
+    #         output_dir = os.path.join(output_dir_base,"PSM3", "WithoutVS", "InitCalibFrame"+str(InitCalibFrame))
+    #     os.makedirs(os.path.join(output_dir), exist_ok=True) 
 
-        with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_T_CR_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "TIME_JCBB_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_TIME_JCBB_HIS, f, default_flow_style=False, sort_keys=False)
-        with open(os.path.join(output_dir, "TIME_FILTER_HIS.yaml"), "w") as f:
-            yaml.dump(PSM3_TIME_FILTER_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_3D_PREDICTION_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_KP_3D_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_3D_MEASUREMENT_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_KP_3D_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_2D_PIXEL_PREDICTION_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_KP_2D_PIXEL_PREDICTION_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "KP_2D_PIXEL_MEASUREMENT_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_KP_2D_PIXEL_MEASUREMENT_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "T_PNP_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_T_PNP_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "T_CR_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_T_CR_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "TIME_JCBB_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_TIME_JCBB_HIS, f, default_flow_style=False, sort_keys=False)
+    #     with open(os.path.join(output_dir, "TIME_FILTER_HIS.yaml"), "w") as f:
+    #         yaml.dump(PSM3_TIME_FILTER_HIS, f, default_flow_style=False, sort_keys=False)

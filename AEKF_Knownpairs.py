@@ -28,7 +28,7 @@ class AEKF_SuperDataSet:
         self.__R = np.zeros(self.__state_cov.shape)
         self.__measure_cov = measure_cov 
 
-    def AEKFReadMeasurement(self, MeasurementDic, KeyPointsPSMDic, K_cam):
+    def AEKFReadMeasurement(self, MeasurementDic, KeyPointsPSMDic, K_cam, rcm_analytical = np.array([np.inf,np.inf,np.inf])):
         n_measure = len(MeasurementDic)
         if n_measure == 0:
             print("No measurements availble in this instance")
@@ -39,7 +39,7 @@ class AEKF_SuperDataSet:
         KeyPointsCamDic = {key: GetPositionInCameraFrame(Tcr_pre, KeyPointsPSMDic[key]) for key in MeasurementDic.keys()}
         PredictionDic = {key: PixelProjection(KeyPointsCamDic[key], K_cam) for key in MeasurementDic.keys()}
         InnovationDic = {key: np.array(MeasurementDic[key]) - np.array(PredictionDic[key]) for key in MeasurementDic.keys()}
-        state_mean_EKF, state_cov_EKF, JacobianDic = self.__EKF_measurement(KeyPointsPSMDic, MeasurementDic, K_cam)
+        state_mean_EKF, state_cov_EKF, JacobianDic = self.__EKF_measurement(KeyPointsPSMDic, MeasurementDic, K_cam, rcm_analytical)
 
         # Get Residual
         T00_tmp = TFromThetaVecTVec(state_mean_EKF[:3], state_mean_EKF[3:])
@@ -93,7 +93,7 @@ class AEKF_SuperDataSet:
         self.__Tcr = self.__Tcr_init @ self.__T00
     
     # Traditional EKF update, which returns Residual Dic
-    def __EKF_measurement(self, KeyPointsPSMDic, MeasurementDic, K_cam):
+    def __EKF_measurement(self, KeyPointsPSMDic, MeasurementDic, K_cam, rcm_analytical = np.array([np.inf,np.inf,np.inf])):
         # Within known correspondences between prediction and measurements
         state_mean_candidate = self.__state_mean.copy()
         # state_cov_candidate = self.__state_cov.copy()
@@ -127,6 +127,24 @@ class AEKF_SuperDataSet:
 
             T00_tmp = TFromThetaVecTVec(state_mean_candidate[:3], state_mean_candidate[3:])
             Tcr_tmp = self.__Tcr_init @ T00_tmp
+
+        if np.inf not in rcm_analytical:
+           rcm_measure = rcm_analytical
+           rcm_predict = state_mean_candidate[3:]
+           scale = 100.0
+           error_rcm = (rcm_measure - rcm_predict) * scale
+           H_rcm_theta = np.zeros((3,3))
+           H_rcm_t = np.identity(3)
+           H_rcm = np.hstack((H_rcm_theta, H_rcm_t))
+           measurement_cov_rcm = np.diag([0.01, 0.01, 0.01]) # TBD
+           S_rcm = np.matmul(np.matmul(H_rcm, state_cov_candidate), H_rcm.T) + measurement_cov_rcm
+           K_rcm = state_cov_candidate @ H_rcm.T @ np.linalg.inv(S_rcm)
+           state_mean_candidate = state_mean_candidate + K_rcm @ error_rcm
+           KH_rcm = K_rcm @ H_rcm
+           mat1_rcm = np.identity(KH_rcm.shape[0]) - KH_rcm
+           state_cov_candidate = mat1_rcm @ state_cov_candidate
+           T00_tmp = TFromThetaVecTVec(state_mean_candidate[:3], state_mean_candidate[3:])
+           Tcr_tmp = self.__Tcr_init @ T00_tmp
 
         return state_mean_candidate, state_cov_candidate, JacobianOutputDic
 
